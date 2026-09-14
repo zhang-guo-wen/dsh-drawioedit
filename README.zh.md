@@ -110,7 +110,7 @@ shim 在服务时注入，位置在 `bootstrap.js` 与 `main.js` 之间，因此
 
 ## 测试
 
-`npm test` 跑八个无需密钥的测试套件，其中两个驱动真实的 headless Chrome。
+`npm test` 跑八个无需密钥的测试套件，其中两个驱动真实的 headless Chrome —— 它们会按所在平台的默认位置查找浏览器；若装在别处，用 `CHROME_PATH` 指向 Chrome/Chromium 可执行文件。
 
 | 套件 | 证明什么 |
 |---|---|
@@ -157,6 +157,7 @@ src/client/editor.ts        消息解析、base64 解码、保存请求
 src/client/transports.ts    读取与保存通道
 tests/boot.mjs              在 headless Chrome 里驱动编辑器，断言用户能看到的结果
 tests/offline.mjs           启动编辑器并断言浏览器实际发出了什么请求
+tests/chrome.mjs            两个浏览器套件所启动的浏览器来自哪里
 build-client.mjs            把浏览器半边打包成 loader 交接格式
 cordis.patch.yml            本包插入的组合行
 ```

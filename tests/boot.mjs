@@ -17,12 +17,12 @@
 //
 // It loads the editor through the shipped URL builder in the shipped sandbox, so
 // the parameters and the frame attributes under test are the product's own.
-import { spawn } from 'node:child_process'
 import { createServer } from 'node:http'
 import { mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
+import { spawnChrome } from './chrome.mjs'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const host = await import(pathToFileURL(join(here, '..', 'lib', 'index.mjs')).href)
@@ -262,7 +262,6 @@ hostPage = `<!doctype html><html><body style="margin:0">
 </script>
 </body></html>`
 
-const CHROME = 'C:/Program Files/Google/Chrome/Application/chrome.exe'
 const profile = mkdtempSync(join(tmpdir(), 'cdp-boot-'))
 
 /**
@@ -282,11 +281,11 @@ async function freePort() {
 }
 
 const CDP_PORT = await freePort()
-const chrome = spawn(CHROME, [
+const chrome = spawnChrome([
   '--headless=new', `--remote-debugging-port=${CDP_PORT}`, `--user-data-dir=${profile}`,
   '--no-first-run', '--no-default-browser-check', '--disable-gpu', '--no-sandbox',
   '--window-size=1200,800', 'about:blank',
-], { stdio: 'ignore' })
+])
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 let ws

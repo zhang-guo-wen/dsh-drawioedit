@@ -110,7 +110,7 @@ The editor is served from the application origin and boots without any third-par
 
 ## Tests
 
-`npm test` runs eight keyless suites. Two of them drive a real headless Chrome.
+`npm test` runs eight keyless suites. Two of them drive a real headless Chrome, which they look for at their platform's default location; set `CHROME_PATH` to a Chrome or Chromium executable if it is installed elsewhere.
 
 | Suite | What it proves |
 |---|---|
@@ -157,6 +157,7 @@ src/client/editor.ts         message parsing, base64 decoding, the save request
 src/client/transports.ts     the file reader and save transport
 tests/boot.mjs               drives the editor in headless Chrome and asserts what a user sees
 tests/offline.mjs            boots the editor and asserts what the browser requested
+tests/chrome.mjs             which browser the two browser-driven suites launch
 build-client.mjs             bundles the browser half into the loader handoff
 cordis.patch.yml             the composition row this package inserts
 ```
