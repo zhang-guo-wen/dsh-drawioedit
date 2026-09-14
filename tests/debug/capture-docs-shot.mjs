@@ -79,7 +79,7 @@ await new Promise((r) => { server.listen(0, '127.0.0.1', r) })
 const ORIGIN = `http://127.0.0.1:${server.address().port}`
 
 const hostPage = `<!doctype html><html><body style="margin:0;overflow:hidden">
-<iframe id="ed" style="display:block;width:100vw;height:100vh;border:0" sandbox="${SANDBOX}"></iframe>
+<iframe id="ed" style="display:block;width:${WIDTH}px;height:${HEIGHT}px;border:0" sandbox="${SANDBOX}"></iframe>
 <script>
   var autosaves = 0;
   window.addEventListener('message', function (event) {
@@ -103,9 +103,13 @@ const hostPage = `<!doctype html><html><body style="margin:0;overflow:hidden">
     out.label = canvas !== null && (canvas.textContent || '').indexOf(${JSON.stringify(LABEL)}) >= 0;
     var name = d.querySelector('.geFilename');
     out.fileLabel = name === null ? null : (name.textContent || '').trim();
-    // Is that name visible anywhere at all? drawio's atlas theme forces compact mode,
-    // which hides .geFilenameContainer; the shim's label is then in the DOM and unseeable.
-    // Reported rather than asserted: this tool captures the README image, it does not gate.
+    // Is that name visible anywhere at all? Reported rather than asserted: this tool
+    // captures the README image, it does not gate.
+    // drawio hides the file name in its compact UI, which it enables at
+    // screen.height <= 740; report the screen so a capture cannot silently regress into
+    // the layout no desktop user sees.
+    out.screen = [w.screen.width, w.screen.height];
+    out.compact = (d.body.className || '').indexOf('geCompactMode') >= 0;
     out.nameShown = Array.prototype.some.call(d.querySelectorAll('body *'), function (el) {
       if (el.children.length !== 0) return false;
       if ((el.textContent || '').indexOf(${JSON.stringify(FILE_NAME)}) < 0) return false;
@@ -152,7 +156,7 @@ const CDP_PORT = await freePort()
 const chrome = spawnChrome([
   '--headless=new', `--remote-debugging-port=${CDP_PORT}`, `--user-data-dir=${profile}`,
   '--no-first-run', '--no-default-browser-check', '--disable-gpu', '--no-sandbox',
-  `--window-size=${WIDTH},${HEIGHT}`, 'about:blank',
+  `--window-size=${WIDTH + 40},${HEIGHT + 120}`, 'about:blank',
 ])
 
 async function finish(code) {
@@ -196,8 +200,13 @@ try {
     ws.send(JSON.stringify({ id, method, params }))
   })
 
+  // Headless Chrome reports an 800x600 screen whatever `--window-size` says, and drawio
+  // switches to its compact UI at `screen.height <= 740` — the one UI that hides the file
+  // name the shim sets. Emulate a desktop screen so the capture shows the layout a
+  // desktop user gets, not the short-window one.
   await send('Emulation.setDeviceMetricsOverride', {
     width: WIDTH, height: HEIGHT, deviceScaleFactor: 2, mobile: false,
+    screenWidth: 1920, screenHeight: 1080,
   })
   await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: THEME }] })
   await send('Page.enable')
@@ -221,7 +230,13 @@ try {
   // The banner repaints on the editor's own schedule, after the message that confirmed
   // the write; capture the settled frame rather than the one the reply raced.
   await sleep(1500)
-  const shot = await send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false })
+  const shot = await send('Page.captureScreenshot', {
+    format: 'png',
+    captureBeyondViewport: false,
+    // `scale: 1` because the emulated deviceScaleFactor already renders at 2x; a clip
+    // scale above 1 would multiply it again.
+    clip: { x: 0, y: 0, width: WIDTH, height: HEIGHT, scale: 1 },
+  })
   if (shot.result?.data === undefined) throw new Error(`captureScreenshot failed: ${JSON.stringify(shot.error)}`)
   const bytes = Buffer.from(shot.result.data, 'base64')
   writeFileSync(OUT, bytes)
