@@ -1,0 +1,5 @@
+# Insert this standalone plugin into the composed profile. `dsh` reads this file
+# from the package's `dsh.bundle.patch` declaration when the row names it.
+- insert:
+    - id: drawioedit
+      name: '@zhang-guo-wen/dsh-drawioedit'
