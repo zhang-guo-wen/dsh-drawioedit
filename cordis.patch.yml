@@ -2,4 +2,4 @@
 # from the package's `dsh.bundle.patch` declaration when the row names it.
 - insert:
     - id: drawioedit
-      name: '@zhang-guo-wen/dsh-drawioedit'
+      name: '@guowenzhang/dsh-drawioedit'

@@ -42,7 +42,7 @@ npx @deepseek-ai/dsh --profile web --dump-config | grep -A2 drawioedit
 ```
 
 Remove it, dependency and layer together, with
-`dsh plugin --profile web remove @zhang-guo-wen/dsh-drawioedit`.
+`dsh plugin --profile web remove @guowenzhang/dsh-drawioedit`.
 
 The profile must compose `@deepseek-ai/dsh-client-ui-sidebar-right`, which owns the tab registry this plugin
 contributes to. Every shipped web profile does.

@@ -18,7 +18,7 @@ import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 
 const root = dirname(fileURLToPath(import.meta.url))
-const HANDOFF_ID = '@zhang-guo-wen/dsh-drawioedit'
+const HANDOFF_ID = '@guowenzhang/dsh-drawioedit'
 const VIRT = '\0dsh-css:'
 const SUFFIX = '.mjs'
 

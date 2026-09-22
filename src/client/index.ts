@@ -26,7 +26,7 @@ import { en, zh } from './locales.ts'
 const NS = 'sidebarDrawioEdit'
 
 /** This implementation's identity in the tab system, and the key its body registers under. */
-export const DRAWIO_EDIT_ID = '@zhang-guo-wen/dsh-drawioedit'
+export const DRAWIO_EDIT_ID = '@guowenzhang/dsh-drawioedit'
 
 /** The tab kind: what the tabs of this type are, and what `openTab` names. */
 export const DRAWIO_EDIT_KIND = 'drawio-edit'

@@ -46,7 +46,7 @@ new Function('window', source)(window)
 
 const handoff = window.__handoff
 assert.ok(handoff, 'client bundle did not register a handoff')
-assert.equal(handoff.id, '@zhang-guo-wen/dsh-drawioedit', 'handoff id mismatch')
+assert.equal(handoff.id, '@guowenzhang/dsh-drawioedit', 'handoff id mismatch')
 
 const requested = []
 const moduleExports = handoff.factory((specifier) => {
@@ -104,7 +104,7 @@ assert.equal(registered.type.kind, 'drawio-edit', 'tab kind mismatch')
 assert.equal([...registered.type.patterns].join(','), '*.drawio', 'patterns mismatch')
 assert.equal(registered.type.title('dsh-resource://file/session/s1/a/flow.drawio'), 'flow.drawio', 'title mismatch')
 assert.equal(registered.body.options.name, 'sidebar.right.pane.tab', 'slot name mismatch')
-assert.equal(registered.body.options.key, '@zhang-guo-wen/dsh-drawioedit', 'slot key mismatch')
+assert.equal(registered.body.options.key, '@guowenzhang/dsh-drawioedit', 'slot key mismatch')
 
 // The tab seat's injected compartment declares only its `tabInfo` hook, so the
 // body carries no custom inject face; the transports are installed by apply, and

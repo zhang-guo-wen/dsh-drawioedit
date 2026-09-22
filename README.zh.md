@@ -37,7 +37,7 @@ npx @deepseek-ai/dsh web
 npx @deepseek-ai/dsh --profile web --dump-config | grep -A2 drawioedit
 ```
 
-卸载用 `dsh plugin --profile web remove @zhang-guo-wen/dsh-drawioedit`，依赖与层一起移除。
+卸载用 `dsh plugin --profile web remove @guowenzhang/dsh-drawioedit`，依赖与层一起移除。
 
 所安装的 profile 必须组合了 `@deepseek-ai/dsh-client-ui-sidebar-right`——本插件所贡献的标签注册表由它拥有。
 所有随附的 web profile 都满足这一点。
