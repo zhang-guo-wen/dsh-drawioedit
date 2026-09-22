@@ -63,6 +63,11 @@ A bare `#R` hash is ignored, so both layers are required. `dshTitle` carries the
 own `title` parameter is not used for that, because drawio percent-decodes it and a file name may contain a percent
 sign.
 
+**Read.** The tab's `dsh-resource://file/…` address names the session and the path, and the body reads the file whole
+through `workspaceFiles.readBytes(sessionId, path, {}, signal)`. Byte payloads are native on this seam — the Remote
+decodes binary fields before the client sees them, so there is nothing to base64-decode — and the result carries the
+Host-resolved absolute path and the freshness token that the write later offers as its guard.
+
 **Save.** The shim reports each change as `{event:'autosave', xml}`, and the tab body POSTs it to
 `/plugins/dsh-drawioedit/save`. That endpoint writes through `ctx.fs` with the version the read observed as a
 freshness guard, so an agent write that landed while the editor was open is refused rather than overwritten. A
@@ -90,7 +95,7 @@ platform's default location; set `CHROME_PATH` to a Chrome or Chromium executabl
 | Suite | What it proves |
 |---|---|
 | `artifact` | both committed bundles are at least as new as their sources |
-| `smoke` | the built client bundle loads with a module table holding only `react`, and registers its tab type and body |
+| `smoke` | the built client bundle loads with a module table holding only `react`, registers its tab type and body, and reads a diagram through the Client Remote's `readBytes` |
 | `serve` | the editor route serves real files, rejects traversal, and injects the shim in the right place |
 | `save` | the save endpoint guards writes with `replaceIfVersion` and refuses malformed requests |
 | `shim` | the shim parses, hooks the editor class, captures an instance, reports edits, and owns the save funnel |
@@ -126,6 +131,11 @@ npm run build      # host half via tsdown, browser half via build-client.mjs
 npm run typecheck  # tsc against the PUBLISHED @deepseek-ai/* packages
 npm test           # eight keyless suites, two of which drive a browser
 ```
+
+`typecheck` covers this package's own sources. It does not cover the Client Remote's method set: the namespaces are
+generated and assembled by the harness at runtime, and this package does not install the gateway that declares them,
+so `ctx.remote` checks as unconstrained. `tests/smoke.mjs` holds that edge instead — it drives the body's read against
+a Remote fake shaped like the generated namespace, so a method the namespace does not carry fails the suite.
 
 The plugin is two halves that update differently: the client bundle (`lib/client.js`) is hot-swapped, or needs a
 page refresh; the host half (`lib/index.mjs`) carries the editor route, the save endpoint, and the shim source, and

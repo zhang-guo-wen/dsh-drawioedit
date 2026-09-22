@@ -19,24 +19,6 @@ export interface EditorMessage {
 }
 
 /**
- * Decode the base64 a complete-byte read delivers on the wire.
- *
- * The Remote transports file bytes as base64 text rather than as a typed array,
- * so the payload must be decoded before anything can read it as text. `atob`
- * yields one character per byte, which is what this turns back into octets.
- * @param base64 - the wire payload.
- * @returns the decoded bytes.
- */
-export function decodeBase64(base64: string): Uint8Array<ArrayBuffer> {
-  const binary = atob(base64)
-  const bytes = new Uint8Array(binary.length)
-  for (let index = 0; index < binary.length; index += 1) {
-    bytes[index] = binary.charCodeAt(index)
-  }
-  return bytes
-}
-
-/**
  * Read one `postMessage` payload as an editor event.
  * @param data - the raw message data.
  * @returns the parsed message, or undefined when it is not one.

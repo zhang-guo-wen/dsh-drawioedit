@@ -18,7 +18,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 import { parseFileAddress } from '@deepseek-ai/dsh-util-workspace-path'
 import { EditorBody } from './EditorBody.tsx'
-import { decodeBase64, saveDiagram } from './editor.ts'
+import { saveDiagram } from './editor.ts'
 import { setEditorTransports, type EditorTransports } from './transports.ts'
 import { en, zh } from './locales.ts'
 
@@ -73,13 +73,14 @@ export function apply(ctx: ClientContext): void {
   const transports: EditorTransports = {
     read: async (address, signal) => {
       const file = hostFileOf(address)
-      const result = await ctx.remote.workspaceFiles.readAll(file.sessionId, file.path, signal)
+      // The complete-file read is `readBytes` with no range; the Host applies its
+      // own full-file cap. The Remote hands back native bytes, and the host's own
+      // report of where it read from and the token for those exact bytes travel
+      // with them, so the write targets that file under that guard.
+      const result = await ctx.remote.workspaceFiles.readBytes(file.sessionId, file.path, {}, signal)
       if (!result.ok) throw new Error(result.error.message)
-      // The wire carries the file as base64 text; decode before it is read as
-      // text, and take the host's own report of where it read from and the token
-      // for those exact bytes, so the write targets that file under that guard.
       return {
-        bytes: decodeBase64(result.value.data),
+        bytes: result.value.data,
         absolutePath: result.value.absolutePath,
         version: result.value.version,
       }

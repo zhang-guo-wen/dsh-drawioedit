@@ -56,6 +56,11 @@ npx @deepseek-ai/dsh --profile web --dump-config | grep -A2 drawioedit
 裸 `#R` 会被忽略，所以两层都必须有。`dshTitle` 携带文件名供 shim 使用；这里**故意不用** drawio 自己的 `title`
 参数，因为 drawio 会对它做百分号解码，而文件名里可能带 `%`。
 
+**读取。** 标签页的 `dsh-resource://file/…` 地址给出会话与路径，body 经
+`workspaceFiles.readBytes(sessionId, path, {}, signal)` 整文件读取。这条缝上的字节字段是**原生字节**——Remote 在
+client 拿到之前就已解出二进制字段，所以没有 base64 需要解码——返回值同时带上 host 解析出的绝对路径，以及之后写入
+时作为守卫的新鲜度令牌。
+
 **保存。** shim 把每次改动作为 `{event:'autosave', xml}` 回传，标签页 body 把它 POST 到
 `/plugins/dsh-drawioedit/save`。该端点经 `ctx.fs` 写入，并带上读取时观察到的版本号作为新鲜度守卫——所以编辑器打开
 期间 agent 写入的内容会被拒绝，而不是被覆盖。写成功后 host 会把 `{action:'saved'}` 发回编辑器，这正是把 drawio
@@ -80,7 +85,7 @@ npx @deepseek-ai/dsh --profile web --dump-config | grep -A2 drawioedit
 | 套件 | 证明什么 |
 |---|---|
 | `artifact` | 两个提交的产物都不早于其源码 |
-| `smoke` | 构建出的 client 产物能按浏览器方式加载（模块表里只有 `react`），并注册标签类型与 body |
+| `smoke` | 构建出的 client 产物能按浏览器方式加载（模块表里只有 `react`），注册标签类型与 body，并经 Client Remote 的 `readBytes` 读出一份图表 |
 | `serve` | 编辑器路由提供真实文件、拒绝路径穿越、把 shim 注入到正确位置 |
 | `save` | 保存端点用 `replaceIfVersion` 守卫写入，并拒绝畸形请求 |
 | `shim` | shim 能解析、钩住编辑器类、抓住实例、上报改动、接管保存汇入点 |
@@ -116,6 +121,10 @@ npm run build      # host 半边走 tsdown，浏览器半边走 build-client.mjs
 npm run typecheck  # 对**已发布**的 @deepseek-ai/* 包做 tsc
 npm test           # 八个无需密钥的套件，其中两个驱动浏览器
 ```
+
+`typecheck` 只覆盖本包自己的源码，**不覆盖 Client Remote 的方法集**：命名空间由 harness 在运行时生成并装配，而本包
+不安装声明它们的 gateway，所以 `ctx.remote` 在这里按不受约束处理。这条边由 `tests/smoke.mjs` 守住——它用一份形状
+与生成命名空间一致的 Remote 假件驱动 body 的读取，因此命名空间里没有的方法会让套件失败。
 
 插件的两半更新方式不同：client 产物（`lib/client.js`）由 harness 热替换，或刷新页面；host 半边
 （`lib/index.mjs`）承载编辑器路由、保存端点与 shim 源码，需要**重启 `dsh web`**。因此改 `src/shim.ts` 在 host
