@@ -5,6 +5,13 @@
   "private": false,
   "type": "module",
   "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zhang-guo-wen/dsh-drawioedit.git"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "main": "lib/index.mjs",
   "exports": {
     ".": {
@@ -44,7 +51,8 @@
   "scripts": {
     "build": "tsdown -c tsdown.config.ts && node build-client.mjs",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "test": "node tests/artifact.mjs && node tests/smoke.mjs && node tests/serve.mjs && node tests/save.mjs && node tests/shim.mjs && node tests/shimdelivery.mjs && node tests/boot.mjs && node tests/offline.mjs"
+    "test": "node tests/artifact.mjs && node tests/smoke.mjs && node tests/serve.mjs && node tests/save.mjs && node tests/shim.mjs && node tests/shimdelivery.mjs && node tests/boot.mjs && node tests/offline.mjs",
+    "prepublishOnly": "node tests/artifact.mjs && node tests/smoke.mjs"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "*",
