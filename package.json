@@ -1,7 +1,7 @@
 {
   "name": "@guowenzhang/dsh-drawioedit",
   "description": "Standalone DeepSeek Harness plugin: edit .drawio diagrams in the Web Sidebar with the upstream draw.io editor",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": false,
   "type": "module",
   "license": "Apache-2.0",
