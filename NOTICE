@@ -1,0 +1,78 @@
+dsh-drawioedit
+Copyright 2026 zhang-guo-wen
+
+This product is licensed under the Apache License, Version 2.0 (see LICENSE).
+
+--------------------------------------------------------------------------
+
+NOT AFFILIATED WITH DRAW.IO
+
+"draw.io" is a registered EU trademark (#018062448) of draw.io Ltd. This
+package is an independent integration and is not affiliated with, endorsed by,
+or sponsored by draw.io Ltd. It uses no draw.io logo or branding.
+
+--------------------------------------------------------------------------
+
+This product includes software developed as part of DeepSeek Harness
+(https://github.com/deepseek-ai/deepseek-harness).
+
+The right-Sidebar tab-type contract this plugin implements
+(`ctx.sidebarRightTabs`, `SidebarRightTabDefinition`, and the keyed
+`sidebar.right.pane.tab` seat) is defined by that project. The contract is
+consumed as published npm packages and is not copied or vendored here. Those
+packages remain under the MIT License:
+
+MIT License
+
+Copyright (c) 2026 DeepSeek
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+--------------------------------------------------------------------------
+
+BUNDLED THIRD-PARTY COMPONENT: THE DRAW.IO EDITOR
+
+The `editor/` directory is a trimmed copy of the draw.io web application from
+https://github.com/jgraph/drawio, Copyright (c) 2006-2025 JGraph Holdings Ltd
+and draw.io AG, licensed under the Apache License, Version 2.0. A copy of that
+license is available at http://www.apache.org/licenses/LICENSE-2.0
+
+The upstream project states the following additional terms:
+
+  The source code in this repository is licensed under the Apache License 2.0.
+
+  The icon sets, stencil libraries, and diagram templates are provided under
+  the following terms: The icon sets and stencil libraries included in this
+  software, and any derivatives thereof (including conversions to other
+  formats, traced reproductions, substantially similar visual representations,
+  or AI-generated images created using these icons as reference or training
+  input), may not be used as software assets in, distributed for use with, or
+  incorporated into Atlassian products or products distributed through the
+  Atlassian marketplace or plugin ecosystem, without explicit written
+  permission. This restriction does not apply to end-user diagram output (such
+  as exported images or documents) created using this software.
+
+  Some icons are originally defined by third-party copyright holders; we have
+  verified that all original licenses permit use in this project. Additional
+  third-party JavaScript libraries are included, all with licenses compatible
+  with Apache 2.0 (no GPL or AGPL).
+
+The `editor/` copy is trimmed: `WEB-INF/` (Java archives), `js/integrate.min.js`
+(cloud-storage integrations), `mxgraph/` (legacy unminified sources), and the
+service worker are removed. No file's contents are modified.
