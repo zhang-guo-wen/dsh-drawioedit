@@ -6,7 +6,7 @@
  * runs in an iframe and the two halves talk over the URL and `postMessage`
  * rather than through React props.
  */
-import { EDITOR_PATH, editorUrl, SAVE_PATH } from '../params.ts'
+import { EDITOR_PATH, editorUrl, RENAME_PATH, SAVE_PATH } from '../params.ts'
 
 export { EDITOR_PATH, editorUrl, SAVE_PATH }
 
@@ -16,6 +16,14 @@ export interface EditorMessage {
   readonly event: string
   /** The diagram XML, present on `load` and `autosave`. */
   readonly xml?: string
+}
+
+/** A rejected save with the host's stable error code for localized guidance. */
+export class DiagramSaveError extends Error {
+  constructor(message: string, readonly code?: string) {
+    super(message)
+    this.name = 'DiagramSaveError'
+  }
 }
 
 /**
@@ -46,24 +54,49 @@ export function parseEditorMessage(data: unknown): EditorMessage | undefined {
  * @param path - absolute path of the file the diagram came from.
  * @param xml - the diagram XML the editor reported.
  * @param version - the freshness token the previous read or write reported.
+ * @param sessionId - the session whose workspace policy governs the write.
  * @returns the freshness token the write produced, for the next save.
  * @throws when the host refuses the write, carrying its reason.
  */
-export async function saveDiagram(path: string, xml: string, version: string): Promise<string> {
+export async function saveDiagram(path: string, xml: string, version: string, sessionId: string): Promise<string> {
   const response = await fetch(SAVE_PATH, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ path, xml, version }),
+    body: JSON.stringify({ path, xml, version, sessionId }),
   })
   const body: unknown = await response.json().catch(() => undefined)
   if (!response.ok) {
     const reason = typeof body === 'object' && body !== null && typeof (body as { error?: unknown }).error === 'string'
       ? (body as { error: string }).error
       : `HTTP ${response.status}`
-    throw new Error(reason)
+    const code = typeof body === 'object' && body !== null && typeof (body as { code?: unknown }).code === 'string'
+      ? (body as { code: string }).code
+      : undefined
+    throw new DiagramSaveError(reason, code)
   }
   const next = typeof body === 'object' && body !== null ? (body as { version?: unknown }).version : undefined
   // A host that does not report the new token yields an empty one, which the next
   // save sends as no guard rather than as a stale one.
   return typeof next === 'string' ? next : ''
+}
+
+/** Rename the currently edited file through the same session permission boundary. */
+export async function renameDiagram(path: string, name: string, version: string, sessionId: string): Promise<{ path: string; version: string }> {
+  const response = await fetch(RENAME_PATH, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ path, name, version, sessionId }),
+  })
+  const body: unknown = await response.json().catch(() => undefined)
+  if (!response.ok) {
+    const reason = typeof body === 'object' && body !== null && typeof (body as { error?: unknown }).error === 'string'
+      ? (body as { error: string }).error : `HTTP ${response.status}`
+    const code = typeof body === 'object' && body !== null && typeof (body as { code?: unknown }).code === 'string'
+      ? (body as { code: string }).code : undefined
+    throw new DiagramSaveError(reason, code)
+  }
+  if (typeof body !== 'object' || body === null || typeof (body as { path?: unknown }).path !== 'string') {
+    throw new DiagramSaveError('rename returned no file path')
+  }
+  return { path: (body as { path: string }).path, version: String((body as { version?: unknown }).version ?? '') }
 }

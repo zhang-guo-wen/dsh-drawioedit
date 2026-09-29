@@ -50,6 +50,10 @@ sandbox.window = sandbox
 sandbox.parent = { postMessage: (data) => { posted.push(data) } }
 sandbox.addEventListener = (type, fn) => { listeners.push({ type, fn }) }
 sandbox.EditorUi = undefined
+sandbox.Sidebar = function Sidebar() {}
+sandbox.Sidebar.prototype.showEntries = function (entries) { this.lastEntries = entries }
+sandbox.Sidebar.prototype.defaultEntries = 'general;flowchart'
+sandbox.mxSettings = { settings: {}, getLibraries: () => 'general;aws4;flowchart' }
 sandbox.mxResources = { get: (key) => (key === 'allChangesSaved' ? 'All changes saved' : null) }
 sandbox.globalThis = sandbox
 
@@ -82,6 +86,13 @@ try {
   const instance = new sandbox.EditorUi()
   check('shim captured the constructed instance', sandbox.__dshShimState.installs === 1)
   check('the captured class still behaves as the original', typeof instance.getFileData === 'function')
+  const sidebar = new sandbox.Sidebar()
+  check('specialized libraries are hidden from More Shapes',
+    !sidebar.enabledLibraries.includes('aws4') && sidebar.enabledLibraries.includes('flowchart'))
+  sidebar.showEntries('general;aws4;flowchart', false)
+  check('stored library choices cannot restore removed shapes', sidebar.lastEntries === 'general;flowchart')
+  sidebar.showEntries()
+  check('saved choices retain core palettes but drop removed libraries', sidebar.lastEntries === 'general;flowchart')
 
   // The message listener must accept the host's create action.
   const messageListener = listeners.find((entry) => entry.type === 'message')
@@ -115,7 +126,7 @@ try {
   for (const name of ['save', 'saveAs']) {
     posted.length = 0
     actions.get(name).funct()
-    check(`the ${name} action reports the diagram`, posted.length === 1, `${posted.length}`)
+    check(`the ${name} action reports the diagram`, posted[0] === JSON.stringify({ event: name, xml }), posted[0])
   }
 
   // The File menu captured its action when the menu was built, before this shim had
@@ -128,7 +139,7 @@ try {
   posted.length = 0
   instance.saveFile(false)
   check('the save funnel no longer reaches drawio\'s saveFile', saveFileCalls === 0, `${saveFileCalls} call(s)`)
-  check('the save funnel reports the diagram', posted.length === 1, `${posted.length} message(s)`)
+  check('the save funnel reports the diagram', posted[0] === JSON.stringify({ event: 'save', xml }), posted[0])
 
   // A confirmed write is what clears drawio's "Unsaved changes" notice.
   messageListener.fn({ data: JSON.stringify({ action: 'saved' }) })

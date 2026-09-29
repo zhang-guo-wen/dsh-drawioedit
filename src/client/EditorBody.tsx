@@ -2,7 +2,9 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import { editorTransports } from './transports.ts'
-import { editorUrl, parseEditorMessage } from './editor.ts'
+import { DiagramSaveError, editorUrl, parseEditorMessage } from './editor.ts'
+import { fileAddressFor } from '@deepseek-ai/dsh-util-workspace-path'
+import { basenameOf } from './file-name.ts'
 import type {} from './locales.ts'
 import css from './EditorBody.module.css'
 
@@ -15,6 +17,7 @@ type Loaded =
     readonly address: string
     readonly xml: string
     readonly absolutePath: string
+    readonly sessionId: string
     readonly version: string
   }
   | { readonly kind: 'failed'; readonly address: string; readonly reason: string }
@@ -33,13 +36,16 @@ export function EditorBody({ useTabInfo, t }: EditorBodyProps): ReactNode {
   const address = tab.contentId
   const [loaded, setLoaded] = useState<Loaded>()
   /** Why the last write failed. A write that lands is reported by the editor itself. */
-  const [failure, setFailure] = useState<string>()
+  const [failure, setFailure] = useState<{ readonly message: string; readonly code: string | undefined }>()
   const frame = useRef<HTMLIFrameElement>(null)
   /** The freshness token to offer on the next save: seeded by the read, advanced by each write. */
   const version = useRef<string>('')
   /** The newest diagram awaiting a write, and whether a write is in flight. */
   const pending = useRef<{ xml: string } | undefined>(undefined)
   const saving = useRef(false)
+  const renameWanted = useRef<string | undefined>(undefined)
+  const renaming = useRef(false)
+  const [renameBusy, setRenameBusy] = useState(false)
 
   useEffect(() => {
     const lifetime = new AbortController()
@@ -58,6 +64,7 @@ export function EditorBody({ useTabInfo, t }: EditorBodyProps): ReactNode {
           address,
           xml: new TextDecoder().decode(opened.bytes),
           absolutePath: opened.absolutePath,
+          sessionId: opened.sessionId,
           version: opened.version,
         })
       },
@@ -72,6 +79,23 @@ export function EditorBody({ useTabInfo, t }: EditorBodyProps): ReactNode {
     if (loaded?.kind !== 'ready') return
     const absolutePath = loaded.absolutePath
 
+    const renameIfReady = (): void => {
+      if (saving.current || pending.current !== undefined || renaming.current || renameWanted.current === undefined) return
+      const requested = renameWanted.current
+      renameWanted.current = undefined
+      renaming.current = true
+      setRenameBusy(true)
+      void editorTransports().rename(absolutePath, requested, version.current, loaded.sessionId).then(result => {
+        tab.actions.openResource(fileAddressFor(loaded.sessionId, undefined, result.path), { replaceTab: true })
+      }).catch((error: unknown) => {
+        setFailure({ message: `${t('renameFailed')}${error instanceof Error ? error.message : String(error)}`, code: error instanceof DiagramSaveError ? error.code : undefined })
+      }).finally(() => {
+        renaming.current = false
+        setRenameBusy(false)
+        drain()
+      })
+    }
+
     /**
      * Write the newest pending diagram, then the next one if it arrived meanwhile.
      *
@@ -82,11 +106,14 @@ export function EditorBody({ useTabInfo, t }: EditorBodyProps): ReactNode {
      * newest diagram is worth writing.
      */
     const drain = (): void => {
-      if (saving.current || pending.current === undefined) return
+      if (saving.current || renaming.current || pending.current === undefined) {
+        renameIfReady()
+        return
+      }
       const xml = pending.current.xml
       pending.current = undefined
       saving.current = true
-      void editorTransports().save(absolutePath, xml, version.current).then(
+      void editorTransports().save(absolutePath, xml, version.current, loaded.sessionId).then(
         // Each write yields the token the next one must offer, so a write by
         // anyone else in between is refused rather than overwritten.
         (next) => {
@@ -98,7 +125,11 @@ export function EditorBody({ useTabInfo, t }: EditorBodyProps): ReactNode {
           frame.current?.contentWindow?.postMessage(JSON.stringify({ action: 'saved' }), '*')
         },
         (error: unknown) => {
-          setFailure(error instanceof Error ? error.message : String(error))
+          renameWanted.current = undefined
+          setFailure({
+            message: error instanceof Error ? error.message : String(error),
+            code: error instanceof DiagramSaveError ? error.code : undefined,
+          })
         },
       ).finally(() => {
         saving.current = false
@@ -110,9 +141,14 @@ export function EditorBody({ useTabInfo, t }: EditorBodyProps): ReactNode {
       // Only the frame this body mounted may drive the write path.
       if (frame.current === null || event.source !== frame.current.contentWindow) return
       const message = parseEditorMessage(event.data)
-      // Only an `autosave` carries edited XML; `load` echoes back what it was given.
-      if (message?.event !== 'autosave' || message.xml === undefined) return
+      if (message?.xml === undefined || !['autosave', 'save', 'saveAs'].includes(message.event)) return
       pending.current = { xml: message.xml }
+      const filename = basenameOf(address)
+      const isInitialName = /^\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}-\d{3}(?:-\d+)?\.drawio$/u.test(filename)
+      if (message.event === 'saveAs' || (message.event === 'save' && isInitialName)) {
+        const chosen = window.prompt(t('renamePrompt'), isInitialName ? '' : filename.replace(/\.drawio$/iu, ''))
+        if (chosen?.trim()) renameWanted.current = chosen.trim()
+      }
       drain()
     }
     window.addEventListener('message', onMessage)
@@ -120,9 +156,14 @@ export function EditorBody({ useTabInfo, t }: EditorBodyProps): ReactNode {
       window.removeEventListener('message', onMessage)
       pending.current = undefined
     }
-  }, [loaded])
+  }, [loaded, address, tab.actions, t])
 
-  const name = address.slice(address.lastIndexOf('/') + 1)
+  const name = basenameOf(address)
+  const failureDetail = failure?.code === 'FS_SANDBOX_DENIED'
+    ? t('saveDenied')
+    : failure?.code === 'FS_STALE_VERSION'
+      ? t('saveConflict')
+      : failure?.message
 
   const src = useMemo(
     () => (loaded?.kind === 'ready' ? editorUrl(loaded.xml, '', name) : undefined),
@@ -138,11 +179,14 @@ export function EditorBody({ useTabInfo, t }: EditorBodyProps): ReactNode {
   // Only a failure earns a line of its own: a confirmed write makes drawio's own
   // toolbar say "All changes saved", so a second line above the frame answers a
   // question the editor has already answered.
-  return <div className={css.frame} data-drawio-editor>
-    {failure !== undefined && <p className={css.status} role="alert">{`${t('saveFailed')}${failure}`}</p>}
+  return <div className={css.frame} data-drawio-editor aria-busy={renameBusy}>
+    {failure !== undefined && <p className={`${css.status} ${css.error}`} role="alert">
+      {`${t('saveFailed')}${failureDetail}`}
+    </p>}
     <iframe
       ref={frame}
       className={css.editor}
+      style={renameBusy ? { pointerEvents: 'none' } : undefined}
       src={src}
       title={t('preview', { name })}
       // The editor is this plugin's own code, served from the application origin,

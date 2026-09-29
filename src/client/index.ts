@@ -18,7 +18,8 @@ import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 import { parseFileAddress } from '@deepseek-ai/dsh-util-workspace-path'
 import { EditorBody } from './EditorBody.tsx'
-import { saveDiagram } from './editor.ts'
+import { basenameOf } from './file-name.ts'
+import { renameDiagram, saveDiagram } from './editor.ts'
 import { setEditorTransports, type EditorTransports } from './transports.ts'
 import { en, zh } from './locales.ts'
 
@@ -34,21 +35,7 @@ export const DRAWIO_EDIT_KIND = 'drawio-edit'
 /** Required browser services: the tab registry, the slot registry, copy, and the file reader. */
 export const inject = ['slots', 'locale', 'sidebarRightTabs', 'remote', 'remote.workspaceFiles']
 
-/**
- * The tab title for one `file:` address: its decoded basename.
- * @param address - a `file:`-shaped address.
- * @returns the decoded last path segment, or the address itself when it has none.
- */
-export function basenameOf(address: string): string {
-  const name = address.slice(address.lastIndexOf('/') + 1)
-  if (name === '') return address
-  try {
-    return decodeURIComponent(name)
-  } catch {
-    // A malformed percent sequence is still a name; showing it raw beats refusing the address.
-    return name
-  }
-}
+export { basenameOf } from './file-name.ts'
 
 /** Read the session and path one `dsh-resource://file/…` address names. */
 function hostFileOf(address: string): { readonly sessionId: string; readonly path: string } {
@@ -82,14 +69,16 @@ export function apply(ctx: ClientContext): void {
       return {
         bytes: result.value.data,
         absolutePath: result.value.absolutePath,
+        sessionId: file.sessionId,
         version: result.value.version,
       }
     },
-    save: async (absolutePath, xml, version) => {
+    save: async (absolutePath, xml, version, sessionId) => {
       // An empty token means no precondition: the very first save after a read
       // that reported none must not be refused as stale.
-      return await saveDiagram(absolutePath, xml, version)
+      return await saveDiagram(absolutePath, xml, version, sessionId)
     },
+    rename: renameDiagram,
   }
   setEditorTransports(transports)
 

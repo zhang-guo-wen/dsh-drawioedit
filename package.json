@@ -52,10 +52,10 @@
     "NOTICE"
   ],
   "scripts": {
-    "build": "tsdown -c tsdown.config.ts && node build-client.mjs",
+    "build": "tsdown -c tsdown.config.ts && node build-client.mjs && node build-stencils.mjs",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "test": "node tests/artifact.mjs && node tests/smoke.mjs && node tests/serve.mjs && node tests/save.mjs && node tests/shim.mjs && node tests/shimdelivery.mjs && node tests/boot.mjs && node tests/offline.mjs",
-    "prepublishOnly": "node tests/artifact.mjs && node tests/smoke.mjs"
+    "test": "node tests/artifact.mjs && node tests/stencils.mjs && node tests/editor-assets.mjs && node tests/smoke.mjs && node tests/serve.mjs && node tests/save.mjs && node tests/rename.mjs && node tests/shim.mjs && node tests/shimdelivery.mjs && node tests/boot.mjs && node tests/offline.mjs",
+    "prepublishOnly": "node tests/artifact.mjs && node tests/stencils.mjs && node tests/editor-assets.mjs && node tests/smoke.mjs"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "*",
@@ -65,6 +65,9 @@
     "@deepseek-ai/dsh-client-ui-slots": ">=0.1.7-0",
     "@deepseek-ai/dsh-fs": ">=0.1.7-0",
     "@deepseek-ai/dsh-host-webserver": ">=0.1.7-0",
+    "@deepseek-ai/dsh-sandbox-policy": ">=0.1.7-0",
+    "@deepseek-ai/dsh-session": ">=0.1.7-0",
+    "@deepseek-ai/dsh-session-query": ">=0.1.7-0",
     "@deepseek-ai/dsh-util-workspace-path": ">=0.1.7-0",
     "react": "*"
   },
@@ -95,6 +98,15 @@
     },
     "@deepseek-ai/dsh-host-webserver": {
       "optional": "true"
+    },
+    "@deepseek-ai/dsh-sandbox-policy": {
+      "optional": true
+    },
+    "@deepseek-ai/dsh-session": {
+      "optional": true
+    },
+    "@deepseek-ai/dsh-session-query": {
+      "optional": true
     }
   },
   "devDependencies": {
@@ -106,6 +118,9 @@
     "@deepseek-ai/dsh-client-ui-slots": ">=0.1.7-0",
     "@deepseek-ai/dsh-fs": ">=0.1.7-0",
     "@deepseek-ai/dsh-host-webserver": ">=0.1.7-0",
+    "@deepseek-ai/dsh-sandbox-policy": "^0.1.7-rc.2",
+    "@deepseek-ai/dsh-session": "^0.1.7-rc.2",
+    "@deepseek-ai/dsh-session-query": "^0.1.7-rc.2",
     "@deepseek-ai/dsh-util-workspace-path": ">=0.1.7-0",
     "@types/node": "^22.10.0",
     "@types/react": "~18.3.1",

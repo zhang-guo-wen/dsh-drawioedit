@@ -140,7 +140,7 @@ export async function serveEditorFile(req: IncomingMessage, res: ServerResponse)
     'content-type': CONTENT_TYPES[extname(file).toLowerCase()] ?? 'application/octet-stream',
     'content-length': String(size),
     // The editor is versioned with the plugin, so a long cache is safe and keeps
-    // the 119 MB payload from being re-fetched on every open.
+    // the editor assets from being re-fetched on every open.
     'cache-control': 'public, max-age=86400',
   })
   // Settle on the response's own completion, not the file stream's: the stream can

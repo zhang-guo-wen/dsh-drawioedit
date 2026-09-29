@@ -88,7 +88,7 @@ hostPage = `<!doctype html><html><body style="margin:0">
   window.addEventListener('message', function (event) {
     try {
       var m = JSON.parse(event.data);
-      if (m != null && m.event === 'autosave') autosaves.push(m.xml);
+      if (m != null && (m.event === 'autosave' || m.event === 'save')) autosaves.push(m.xml);
     } catch (e) { /* not the editor's protocol */ }
   });
   // Drawio's Save reached through the key the user presses. A synthetic event is
@@ -174,6 +174,11 @@ hostPage = `<!doctype html><html><body style="margin:0">
         return (t.textContent || '').indexOf(${JSON.stringify(LABEL)}) >= 0;
       });
       out.shim = w.__dshShimState || null;
+      out.enabledLibraries = w.Sidebar && w.Sidebar.prototype.enabledLibraries;
+      out.coreStencils = ['arrows.xml', 'basic.xml', 'bpmn.xml', 'flowchart.xml'].map(function (name) {
+        var xml = w.mxStencilRegistry.loadStencil('stencils/' + name);
+        return xml != null && xml.documentElement != null && xml.documentElement.nodeName === 'shapes';
+      });
       out.pinned = w.getComputedStyle(d.body).overflow === 'hidden';
       out.menuBarTop = window.menuBarTop();
       // The title bar's file name, which must be the name the pane opened.
@@ -258,7 +263,7 @@ hostPage = `<!doctype html><html><body style="margin:0">
       .catch(function () { postFailures++; });
     setTimeout(tick, 2000);
   })();
-  document.getElementById('ed').src = ${JSON.stringify(host.editorUrl(DIAGRAM, ORIGIN, 'dsh-plugin-flow.drawio'))};
+  document.getElementById('ed').src = ${JSON.stringify(host.editorUrl(DIAGRAM, ORIGIN, 'AI员工架构图.drawio'))};
 </script>
 </body></html>`
 
@@ -377,6 +382,12 @@ try {
   check('the title is drawio\'s own', String(state.title ?? '').includes('draw.io'), String(state.title))
   check('the shim hooked the editor class', state.shim?.hooked === true, JSON.stringify(state.shim ?? null))
   check('the shim captured the editor instance', (state.shim?.installs ?? 0) >= 1, JSON.stringify(state.shim ?? null))
+  check('the shape picker excludes specialist libraries',
+    Array.isArray(state.enabledLibraries) && state.enabledLibraries.includes('flowchart') && !state.enabledLibraries.includes('aws4'),
+    JSON.stringify(state.enabledLibraries ?? null))
+  check('the four retained stencil libraries load in the editor',
+    Array.isArray(state.coreStencils) && state.coreStencils.length === 4 && state.coreStencils.every(Boolean),
+    JSON.stringify(state.coreStencils ?? null))
   // The shim is host-half code served from the host process's memory, so which
   // revision the browser is actually running is worth asserting rather than assuming.
   check('the running shim is this build', state.shim?.revision === host.SHIM_REVISION, String(state.shim?.revision))
@@ -388,7 +399,7 @@ try {
   // The whole client half of the write path, end to end in a browser: the key the
   // user presses in the real editor produces the autosave the pane writes to disk.
   check('pressing Ctrl+S in the editor reports the diagram', (state.shim?.reports ?? 0) >= 1, JSON.stringify(state.shim ?? null))
-  check('the parent received the diagram as an autosave', (state.autosaves ?? 0) >= 1, `${state.autosaves ?? 0} message(s)`)
+  check('the parent received the diagram as a save message', (state.autosaves ?? 0) >= 1, `${state.autosaves ?? 0} message(s)`)
   check('the reported diagram is the one on the canvas', state.autosaveHasLabel === true, `${state.lastAutosaveBytes ?? 0} bytes`)
   // Where the menu renders, not where its style says it is. mxgraph's common.css is what
   // makes a popup absolutely positioned; without it drawio's own coordinates are ignored
@@ -417,7 +428,7 @@ try {
   check('the Save command opens no save dialog', state.dialog === null, String(state.dialog ?? ''))
   // The editor labels the diagram after the file the pane opened, rather than
   // "Untitled Diagram", which names nothing the user can recognise.
-  check('the editor shows the file name it was given', state.fileLabel === 'dsh-plugin-flow.drawio', String(state.fileLabel ?? ''))
+  check('the editor shows the Chinese file name it was given', state.fileLabel === 'AI员工架构图.drawio', String(state.fileLabel ?? ''))
   check('the editor reported no initialization failure', severe.length === 0, severe.slice(0, 2).join(' | '))
   console.log(`     name element: ${JSON.stringify(state.nameElement ?? null)} | title: ${JSON.stringify(state.title ?? '')}`)
 } catch (error) {

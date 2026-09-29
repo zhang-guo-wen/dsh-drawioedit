@@ -21,3 +21,9 @@
   color: var(--dsw-color-text-secondary);
   font-size: 13px;
 }
+
+.error {
+  color: #8f2e20;
+  background: #fff3ef;
+  border-bottom: 1px solid #f1c7bc;
+}

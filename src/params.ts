@@ -11,6 +11,7 @@ export const EDITOR_PATH = '/plugins/dsh-drawioedit/editor/index.html'
 
 /** Where the client posts an edited diagram back. */
 export const SAVE_PATH = '/plugins/dsh-drawioedit/save'
+export const RENAME_PATH = '/plugins/dsh-drawioedit/rename'
 
 /**
  * Cloud integrations the editor must not start, and the parameter that turns each

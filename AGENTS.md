@@ -3,7 +3,7 @@
 本仓 `dsh-drawioedit` 是**独立于 harness monorepo** 的 DeepSeek Harness (DSH) 插件：在 Web 侧栏标签页里用**上游 draw.io 编辑器**就地编辑 `.drawio` 图表，改动写回标签页打开的那个文件。
 它不打包 `@deepseek-ai/*`，运行时从宿主 harness 解析这些包；随包的 `editor/` 是裁剪过的上游 drawio webapp，不是 harness 的代码。
 
-姊妹插件：[`dsh-drawio`](../dsh-drawio)（用 maxGraph 只读预览 `.drawio`，约 1 MB，而本仓因为带上游编辑器约 119 MB）。
+姊妹插件：[`dsh-drawio`](../dsh-drawio)（用 maxGraph 只读预览 `.drawio`，约 1 MB，而本仓因为带上游编辑器，解包后约 43 MiB）。
 两者互不 import、互不依赖，可单独安装；渲染与编辑能力因此不共享任何代码，只有文件格式是共同的。
 
 ## 目录
@@ -11,23 +11,23 @@
 仓库根**就是**包：`package.json` 即 `@guowenzhang/dsh-drawioedit`。
 这不是风格选择——`dsh plugin add <git-url>` 取的是仓库根，包放在 `packages/*` 下会被装成错误的东西。
 
-- `src/index.ts` —— host 半边入口：`inject = ['webServer', 'fs']`，`apply` 里经 `ctx.effect(...)` 注册编辑器静态路由与保存端点；并把 `SHIM_PATH` / `SHIM_REVISION` / `SHIM_SOURCE` / `assertShimUsable` / `EDITOR_PATH` / `editorUrl` / `EDITOR_ROUTE` / `SAVE_ROUTE` re-export 给本包自己的测试，免得它们伸手进内部模块路径。
-- `src/serve.ts` —— `EDITOR_ROUTE = '/plugins/dsh-drawioedit/editor'` 前缀路由：路径穿越防护（`normalize` 收敛 `..` 后做包含性检查，越界一律 403；不存在的名字才 404）、content-type 表、`index.html` 的 shim 注入、`SHIM_PATH` 以 `no-store` 提供、其余文件 `public, max-age=86400`（119 MB 的载荷不该每次打开都重取）。
-- `src/save.ts` —— `SAVE_ROUTE = '/plugins/dsh-drawioedit/save'`：只接受 POST，请求体上限 `MAX_DIAGRAM_BYTES = 8 * 1024 * 1024`（超限拒绝而不是截断），`parseSaveRequest` 校验字段，写入走 `fs.resolve` + `fs.writeText(target, xml, { kind: 'replaceIfVersion', version })`，响应回带新版本令牌。
-- `src/shim.ts` —— 注入编辑器页面的 pre-load shim 源码（`SHIM_REVISION = 5`）、`SHIM_PATH`、模块加载即执行的 `assertShimUsable`（校验包裹、截断、`</script`、花括号配平、模板字面量里残留的 `${`）。
+- `src/index.ts` —— host 半边入口：`inject = ['webServer', 'fs', 'sessions', 'sandboxPolicy', 'sessionQuery']`，`apply` 里经 `ctx.effect(...)` 注册编辑器静态路由与保存端点；并把 `SHIM_PATH` / `SHIM_REVISION` / `SHIM_SOURCE` / `assertShimUsable` / `EDITOR_PATH` / `editorUrl` / `EDITOR_ROUTE` / `SAVE_ROUTE` re-export 给本包自己的测试，免得它们伸手进内部模块路径。
+- `src/serve.ts` —— `EDITOR_ROUTE = '/plugins/dsh-drawioedit/editor'` 前缀路由：路径穿越防护（`normalize` 收敛 `..` 后做包含性检查，越界一律 403；不存在的名字才 404）、content-type 表、`index.html` 的 shim 注入、`SHIM_PATH` 以 `no-store` 提供、其余文件 `public, max-age=86400`。
+- `src/save.ts` —— `SAVE_ROUTE = '/plugins/dsh-drawioedit/save'`：只接受 POST，请求体上限 `MAX_DIAGRAM_BYTES = 8 * 1024 * 1024`（超限拒绝而不是截断），`parseSaveRequest` 校验字段及会话 ID，写入走 `fs.resolve` + 带会话沙箱策略和 `replaceIfVersion` 守卫的 `fs.writeText`，响应回带新版本令牌；权限拒绝返回结构化错误码供客户端本地化。
+- `src/shim.ts` —— 注入编辑器页面的 pre-load shim 源码（`SHIM_REVISION = 6`）、`SHIM_PATH`、模块加载即执行的 `assertShimUsable`（校验包裹、截断、`</script`、花括号配平、模板字面量里残留的 `${`）。
 - `src/params.ts` —— 编辑器 URL（`EDITOR_PATH`、`editorUrl()`）与按名字关闭的云集成清单（`DISABLED_INTEGRATIONS`）。
 - `src/client/` —— 浏览器半边：`index.ts`（标签类型、body 座位、transports 安装）、`EditorBody.tsx`（iframe 与消息泵）、`transports.ts`（read/save 模块句柄）、`editor.ts`（消息解析与 save POST）、`locales.ts`、`EditorBody.module.css`。
-- `editor/` —— 随包的上游 drawio webapp（裁剪说明见「editor/ 的裁剪」）；`package.json` 的 `files` 里带着它。
+- `editor/` —— 随包的上游 drawio webapp（裁剪说明见「editor/ 的裁剪」）；`package.json` 的 `files` 里带着它。`build-stencils.mjs` 从保留的 XML 重建 `editor/js/stencils.min.js`。
 - `lib/` —— 构建产物：**已提交进仓库**（`index.mjs` host + `client.js` 浏览器 handoff），这样别人可以直接从 git 安装。改完源码**记得 `npm run build` 并把 `lib/` 一起提交**；`lib/index.mjs` 里内嵌了 shim 源码。
 - `cordis.patch.yml` —— 把插件行插入组合的 bundle 层。
 - `docs/example.png` / `docs/example.drawio` —— README 的截图与它的源文件。
-- `tests/` —— 八个套件（`npm test`）与不进套件的 `tests/debug/`。
+- `tests/` —— 十个套件（`npm test`）与不进套件的 `tests/debug/`。
 
 ## 构建
 
 ```sh
 npm install
-npm run build      # tsdown（host） + node build-client.mjs（client）
+npm run build      # tsdown（host） + node build-client.mjs（client） + node build-stencils.mjs
 npm run typecheck  # tsc --noEmit -p tsconfig.json，针对「已发布」的 @deepseek-ai/* 包
 npm test           # 八个无需密钥的套件，其中两个驱动真实浏览器
 ```
@@ -35,7 +35,7 @@ npm test           # 八个无需密钥的套件，其中两个驱动真实浏�
 - host：`tsdown` 打 `src/index.ts` → `lib/index.mjs`，`tsdown.config.ts` 里 `deps.neverBundle: [/^@deepseek-ai\//]` 让所有 `@deepseek-ai/*` 保持 external。
 - client：`build-client.mjs`（rolldown）→ `lib/client.js`，包成 `window.__ModuleLoader__.load({ id, factory })`，react 与 `@deepseek-ai/*` external，`.module.css` 用 lightningcss 编译（`cssModules.pattern: '[hash]_[local]'`）并内联成一个去重的 `<style>` 标签；类名映射按局部名排序后再序列化，保证构建可复现。
 - 本仓两半都不使用装饰器（host 侧没有 `@Remote`），所以 `tsdown.config.ts` 里没有装饰器降级 transform。
-- `prepublishOnly` 只跑 `artifact` 与 `smoke` 两个套件，所以发布前的手工检查仍以 `npm test` 为准。
+- `prepublishOnly` 跑 `artifact`、`stencils`、`editor-assets` 与 `smoke` 四个套件，所以发布前的手工检查仍以 `npm test` 为准。
 
 **`platform: 'browser'` 是显式设置的。** harness 单仓打客户端产物用的 `packages/client/tsdown.client.ts` 并未发布，所以本仓自己打包浏览器半。在 rolldown 的 `node` platform 下，依赖会经 `node` export 条件解析：若某库的 `exports` 把平台条件排在 `import` 之前，它的**服务端入口**就会被内联，而那些入口可能在模块顶层 `require("module")`，产出浏览器模块表无法应答的标识符。`build-client.mjs` 的 `EXTERNAL` 只有 react 与 DSH 客户端包（`@deepseek-ai/cordis`、`dsh-client-locale`、`dsh-client-ui-renderer`、`dsh-client-ui-slots`、`dsh-client-ui-sidebar-right`）；`@deepseek-ai/dsh-util-workspace-path` 这类浏览器安全的工具**被内联**（对齐 harness 的 INLINE_SAFE 策略），所以部署产物不会向模块表索取它。
 
@@ -55,7 +55,7 @@ npm test           # 八个无需密钥的套件，其中两个驱动真实浏�
 
 扩展点归 `@deepseek-ai/dsh-client-ui-sidebar-right` 所有，本插件只按它的契约贡献两项：标签类型进 `ctx.sidebarRightTabs`（`id: '@guowenzhang/dsh-drawioedit'`、`kind: 'drawio-edit'`、`patterns: ['*.drawio']`、`title: basenameOf`），body 进点名座位 `sidebar.right.pane.tab`，key 同为该实现 id。宿主 profile 必须组合该包，所有随附的 web profile 都满足；没有它时 `inject` 拿不到服务，标签页不会出现。
 
-host 侧另有两处接线：`inject = ['webServer', 'fs']`，`webServer` 提供路由注册表（前缀路由 + 精确路由），`fs` 提供带新鲜度守卫的写入。`ctx.remote.workspaceFiles` 是 client 侧读取文件用的 Remote 命名空间，在 `dsh.client.inject` 之外由浏览器半边按需取用。
+host 侧另有五处接线：`inject = ['webServer', 'fs', 'sessions', 'sandboxPolicy', 'sessionQuery']`，`webServer` 提供路由注册表（前缀路由 + 精确路由），`fs` 提供带新鲜度守卫的写入，`sessions`、`sandboxPolicy` 与 `sessionQuery` 为 HTTP 保存请求恢复标签页所属会话的写入权限（包括宿主重启后的持久化会话）。`ctx.remote.workspaceFiles` 是 client 侧读取文件用的 Remote 命名空间，在 `dsh.client.inject` 之外由浏览器半边按需取用。
 
 ## 部署与生效语义
 
@@ -81,7 +81,7 @@ npx @deepseek-ai/dsh plugin --profile web add /absolute/path/to/dsh-drawioedit
 npx @deepseek-ai/dsh plugin --profile web remove @guowenzhang/dsh-drawioedit
 ```
 
-`lib/` 已提交进仓库，所以装完即可运行，**使用者不需要构建**；下载里带着 `editor/`（约 119 MB）。本地目录安装建的是 symlink，`file:` 依赖则可能退化成物理拷贝，那时改源码不会影响正在跑的 dsh。装完确认层进了组合：
+`lib/` 已提交进仓库，所以装完即可运行，**使用者不需要构建**；下载里带着 `editor/`（约 43 MiB）。本地目录安装建的是 symlink，`file:` 依赖则可能退化成物理拷贝，那时改源码不会影响正在跑的 dsh。装完确认层进了组合：
 
 ```sh
 npx @deepseek-ai/dsh web
@@ -127,26 +127,28 @@ npx @deepseek-ai/dsh --profile web --dump-config | grep -A2 drawioedit
 
 **读取：`dsh-resource://file/…` + `workspaceFiles.readBytes`。** 标签页的地址给出会话与路径（`parseFileAddress`，`scope` 必须是 `session`），body 经 `workspaceFiles.readBytes(sessionId, path, {}, signal)` 整文件读取。这条缝上的字节是**原生字节**——Remote 在 client 拿到之前已解出二进制字段，所以没有 base64 需要解码——返回值同时带上 host 解析出的**绝对路径**与新鲜度令牌。用绝对路径而不是工作区相对路径是必须的：读取按会话工作区根解析相对路径，而经 `fs` 写入按进程目录解析，把相对路径原样传回去会写到另一个文件。
 
-**保存：`/plugins/dsh-drawioedit/save` + `replaceIfVersion` 守卫。** Workspace Files 是只读缝，改动回不去，所以走应用同源的 POST。shim 把每次改动作为 `{event:'autosave', xml}` 回传，body 取最新的一份写回；一次写入完成后 host 回带新令牌，下一次保存必须提供它。守卫是**新鲜度前置条件**：编辑器打开期间 agent 写入的内容会被拒绝，而不是被静默覆盖。客户端把并发收成一条链——同一时刻只有一个保存在飞，等待期间只保留最新的一份图（拖动形状会产生一串改动事件），否则两个保存会拿着同一个令牌、第二个被误判为过期。写成功后 host 把 `{action:'saved'}` 发回编辑器，shim 调 `ui.editor.setModified(false)` 并把状态区换成 `mxResources` 的 `allChangesSaved`，这正是把 drawio 自己的 "Unsaved changes" 变成 "All changes saved" 的那一步——不确认的话，写成功看起来和写失败一样。
+**保存：`/plugins/dsh-drawioedit/save` + `replaceIfVersion` 守卫。** Workspace Files 是只读缝，改动回不去，所以走应用同源的 POST。shim 把每次改动作为 `{event:'autosave', xml}` 回传，body 取最新的一份写回，并带上读取文件的会话 ID；服务端查找活动会话或读取持久化会话的 header 与最近一次 `sandbox/mode` 事件，并显式把相应沙箱策略传给 `fs.writeText`，否则 HTTP 请求会错误地落到服务进程的默认工作区边界。一次写入完成后 host 回带新令牌，下一次保存必须提供它；空令牌表示不设版本前置条件。守卫是**新鲜度前置条件**：编辑器打开期间 agent 写入的内容会被拒绝，而不是被静默覆盖。客户端把并发收成一条链——同一时刻只有一个保存在飞，等待期间只保留最新的一份图（拖动形状会产生一串改动事件），否则两个保存会拿着同一个令牌、第二个被误判为过期。写成功后 host 把 `{action:'saved'}` 发回编辑器，shim 调 `ui.editor.setModified(false)` 并把状态区换成 `mxResources` 的 `allChangesSaved`，这正是把 drawio 自己的 "Unsaved changes" 变成 "All changes saved" 的那一步——不确认的话，写成功看起来和写失败一样。沙箱拒绝与版本冲突会带结构化错误码，客户端用本地化文案提示修改未保存。
 
 **为什么需要 shim。** drawio 的 `#create=` 握手在同源 iframe 里用不了：它的消息监听器在 `evt.source == (window.opener || window.parent)` 不成立时直接返回（App.js），这个身份判断是为 `Embed.js` 打开的弹出窗口写的，消息因此在没有任何报错的地方被丢掉。编辑器又把实例藏在闭包里——DOM 上没有引用，也没有任何全局暴露它（对照随包构建核实过）。所以 shim 拦截 `window.EditorUi` 的**赋值**（`Object.defineProperty` 的 get/set + `WeakSet`），用**只转发的 `Proxy`** 抓住构造出的实例，并接管 `ui.saveFile`——所有保存命令唯一汇入的那个方法；同时也重新绑定 `ui.actions` 的 `save` / `saveAs`（状态横幅是在点击时才查 action 的）。`Proxy` 而不是包装类是必须的：drawio 在赋值之后才完成这个类，`mxEventSource` mixin 稍后替换 prototype，持有旧 prototype 的包装类会让 `Editor` 这类子类构造时缺 `setEventSource`，drawio 记下 "SEVERE this.setEventSource is not a function" 并永远停在 splash 上。shim 还打了 `mxUtils.fit`（把弹出菜单限制在 frame 内，而不是按文档测量）与文档 `scrollTop` 归零（这个文档是应用 frame，不是页面），并在捕获阶段兜底 Ctrl+S。shim 也认 `{action:'create', data}`（调用编辑器自己的 `executeCreateObject`），但本插件 body 走 URL 加载这条无需握手的路径，因此不依赖它。
 
-**注入位置在 `bootstrap.js` 与 `main.js` 之间。** `injectShim` 在服务时把 `<script src="${SHIM_PATH}"></script>` 插到 `index.html` 里 `bootstrap.js` 那一行之后，所以 `urlParams` 已经就绪、而定义 `EditorUi` 的 `main.js` 还没执行；vendored 编辑器文件保持原样，这件事只有一个可见的位置。shim 以 `cache-control: no-store` 提供——它是 host 半边代码，陈旧副本从外面看只表现为"编辑器坏了"。`SHIM_REVISION` 记录它自己的版本（2：改为 Proxy 转发；3：保存命令写回文件而不是走 drawio 的下载流程，并清掉未保存提示；4：在保存汇入点拦截而不是在 action 对象上，并把图表按打开的文件命名；5：弹出菜单按 frame 收边，文档不保留滚动位置）。
+**注入位置在 `bootstrap.js` 与 `main.js` 之间。** `injectShim` 在服务时把 `<script src="${SHIM_PATH}"></script>` 插到 `index.html` 里 `bootstrap.js` 那一行之后，所以 `urlParams` 已经就绪、而定义 `EditorUi` 的 `main.js` 还没执行；vendored 编辑器的 HTML 保持原样，这件事只有一个可见的位置。shim 以 `cache-control: no-store` 提供——它是 host 半边代码，陈旧副本从外面看只表现为"编辑器坏了"。`SHIM_REVISION` 记录它自己的版本（2：改为 Proxy 转发；3：保存命令写回文件而不是走 drawio 的下载流程，并清掉未保存提示；4：在保存汇入点拦截而不是在 action 对象上，并把图表按打开的文件命名；5：弹出菜单按 frame 收边，文档不保留滚动位置；6：限制可选图形库）。
 
 **云集成按名字关闭。** drawio 的每个云集成默认都会联网加载第三方 SDK，`src/params.ts` 的 `DISABLED_INTEGRATIONS` 在 URL 里逐个关掉：`gapi`、`db`、`od`、`ms365`、`drive`、`picker`、`tr`、`sockets`。这份清单只有一个家——host 的 `editorUrl()`、`tests/offline.mjs` 的宿主页与生产 body 用的是同一个构造器，所以它们不可能漂移。`offline` 套件在编辑器启动期间出现任何远程主机时失败，并额外证明图里带外部实体的 `DOCTYPE` 不会触发任何请求（drawio 用平台 `DOMParser` 解析，不解析外部实体）。
 
-**`editor/` 的裁剪。** 由上游 webapp 裁剪而来：去掉 `WEB-INF/`（Java jar）、`js/integrate.min.js`、service worker，以及未压缩的旧 `mxgraph/src` 源码——148.6 MB 降到 119.0 MB。`mxgraph/css/common.css` **必须保留**：它是 `div.mxPopupMenu { position: absolute }` 唯一的声明处。
+**`editor/` 的裁剪。** 由上游 webapp 裁剪而来：去掉 `WEB-INF/`（Java jar）、`js/integrate.min.js`、service worker，以及未压缩的旧 `mxgraph/src` 源码。进一步只保留 `stencils/` 中的 `arrows.xml`、`basic.xml`、`bpmn.xml`、`flowchart.xml`，并从它们重建 `js/stencils.min.js`；专业图形的 `img/lib/` 图标与「更多图形」预览图也已移除。`js/diagramly/` 顶层、`js/diagramly/sidebar/` 和 `js/grapheditor/` 的开发版 JS 源码不随包分发，生产环境按需加载的 `vsdx`、`emf`、`graphml` 等子目录保留；`?dev=1` 不支持。云、网络模板及依赖已移除图形库的专业模板已删除，并同步清理 `templates/index.xml` 对应条目。shim 将「更多图形」及搜索限制在通用图形、流程图、ER、UML、BPMN、DFD、C4 等已保留分类。解包后约 43 MiB。已有图表若引用被移除的专业形状，可能无法正确显示。`mxgraph/css/common.css` **必须保留**：它是 `div.mxPopupMenu { position: absolute }` 唯一的声明处。
 
 ## 测试
 
-`npm test` 跑八个无需密钥的套件；其中 `boot` 与 `offline` 驱动真实的 headless Chrome，默认按平台查找（Windows `C:/Program Files/Google/Chrome/Application/chrome.exe`、macOS `/Applications/Google Chrome.app/Contents/MacOS/Google Chrome`、Linux `google-chrome`），装在别处就用 `CHROME_PATH` 指向 Chrome/Chromium 可执行文件；找不到可执行文件时探针会明确打印原因并以 2 退出，而不是看起来像挂死。
+`npm test` 跑十个无需密钥的套件；其中 `boot` 与 `offline` 驱动真实的 headless Chrome，默认按平台查找（Windows `C:/Program Files/Google/Chrome/Application/chrome.exe`、macOS `/Applications/Google Chrome.app/Contents/MacOS/Google Chrome`、Linux `google-chrome`），装在别处就用 `CHROME_PATH` 指向 Chrome/Chromium 可执行文件；找不到可执行文件时探针会明确打印原因并以 2 退出，而不是看起来像挂死。
 
 | 套件 | 证明什么 |
 |---|---|
 | `artifact` | 两个提交的产物都不早于其源码（`lib/client.js` 不早于 `src/client`，`lib/index.mjs` 不早于 `src/**/*.ts`） |
+| `stencils` | 保留的四个 XML 与 `js/stencils.min.js` 中的压缩副本逐字节相同，专业库未重新混入安装包 |
+| `editor-assets` | 未压缩开发 JS 已移除、按需导入器保留，模板索引 XML 有效且每个条目都指向随包文件 |
 | `smoke` | 构建出的 client 产物能按浏览器方式加载（模块表里只有 `react`），注册标签类型与 body，并经 Client Remote 的 `readBytes` 读出一份图表 |
 | `serve` | 编辑器路由提供真实文件、拒绝路径穿越（含 `%2e%2e%2f` 编码形式）、把 shim 注入到 `bootstrap.js` 之后与 `main.js` 之前，并交叉核对 client 产物引用的是同一条路由 |
-| `save` | 保存端点用 `replaceIfVersion` 守卫写入、拒绝畸形请求与非 POST，且对畸形请求不做任何写入尝试 |
+| `save` | 保存端点用标签页会话的权限与 `replaceIfVersion` 守卫写入、拒绝未知会话、畸形请求与非 POST，且对畸形请求不做任何写入尝试 |
 | `shim` | shim 能解析（`vm.Script`）、钩住编辑器类、抓住实例、上报改动、接管保存汇入点 |
 | `shimdelivery` | shim 经插件路由在定义编辑器的脚本之前到达，且响应不带 `max-age` |
 | `boot` | 编辑器启动到画布、画出图表、回传、命名，并让菜单在菜单栏旁边展开 |

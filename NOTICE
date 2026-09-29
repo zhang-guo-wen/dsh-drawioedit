@@ -74,5 +74,8 @@ The upstream project states the following additional terms:
   with Apache 2.0 (no GPL or AGPL).
 
 The `editor/` copy is trimmed: `WEB-INF/` (Java archives), `js/integrate.min.js`
-(cloud-storage integrations), `mxgraph/` (legacy unminified sources), and the
-service worker are removed. No file's contents are modified.
+(cloud-storage integrations), legacy unminified mxGraph sources, the service
+worker, specialist stencil XML libraries, icons, palette previews, development
+JavaScript sources, and cloud/network templates are removed. `js/stencils.min.js`
+is regenerated from the retained core stencil XML files. `templates/index.xml`
+lists only the retained templates; other vendored files are unchanged.

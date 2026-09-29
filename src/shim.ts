@@ -45,8 +45,10 @@ export const SHIM_PATH = '/plugins/dsh-drawioedit/editor/__dsh-shim.js'
  *    the file the pane opened.
  * 5: popups are fitted against the frame rather than the document, and the document
  *    holds no scroll position, so a menu opens at its menu bar.
+ * 6: the shape picker only offers libraries whose stencils ship with the plugin.
+ * 7: manual Save and Save As report their own events so the host can rename files.
  */
-export const SHIM_REVISION = 5
+export const SHIM_REVISION = 7
 
 /** How often the shim checks whether the edited diagram changed, in ms. */
 const POLL_MS = 1000
@@ -104,10 +106,10 @@ const BODY = `
       }
     }
 
-    function post(xml) {
+    function post(xml, eventName) {
       window.__dshShimState.reports++;
       try {
-        window.parent.postMessage(JSON.stringify({ event: 'autosave', xml: xml }), '*');
+        window.parent.postMessage(JSON.stringify({ event: eventName || 'autosave', xml: xml }), '*');
       } catch (error) { /* the host went away */ }
     }
 
@@ -126,11 +128,11 @@ const BODY = `
       } catch (error) { /* the status area is cosmetic */ }
     }
 
-    function saveNow() {
+    function saveNow(eventName) {
       var xml = currentXml();
       if (xml == null) return;
       last = xml;
-      post(xml);
+      post(xml, eventName || 'save');
     }
 
     // Names the diagram after the file the pane opened, which is otherwise "Untitled
@@ -157,7 +159,7 @@ const BODY = `
         // Re-applied rather than set once: whatever replaces this method would put
         // drawio's own save back, which opens a dialog instead of writing the file.
         if (ui.saveFile !== ownSave) {
-          ownSave = function () { saveNow(); };
+          ownSave = function () { saveNow('save'); };
           ui.saveFile = ownSave;
         }
         window.__dshShimState.saveFileOwned = ui.saveFile === ownSave;
@@ -171,7 +173,7 @@ const BODY = `
         if (ui.actions == null || ui.actions.get == null) return;
         var action = ui.actions.get(name);
         if (action != null && action.funct != null) {
-          action.funct = function () { saveNow(); };
+          action.funct = function () { saveNow(name === 'saveAs' ? 'saveAs' : 'save'); };
           window.__dshShimState.rebound.push(name);
         }
       } catch (error) { /* older builds: the poll below still reports edits */ }
@@ -269,6 +271,8 @@ const BODY = `
     var attempts = 0;
     var early = window.setInterval(function setup() {
       attempts++;
+      rebind('save');
+      rebind('saveAs');
       interceptSave();
       keepPopupsInFrame();
       pinDocument();
@@ -288,7 +292,7 @@ const BODY = `
       if ((event.ctrlKey || event.metaKey) && !event.altKey && String(event.key).toLowerCase() === 's') {
         window.__dshShimState.keys++;
         event.preventDefault();
-        saveNow();
+        saveNow('save');
       }
     }, true);
   }
@@ -305,6 +309,36 @@ const BODY = `
   // "SEVERE this.setEventSource is not a function", and left its splash page up.
   //
   // A Proxy keeps every read and write on the live class, including the prototype.
+  // Sidebar is defined by the time EditorUi is constructed. Its built-in filter
+  // applies both to More Shapes and the search index, so removed libraries never
+  // appear as selectable palettes with missing stencil files.
+  var libraryIds = ['general', 'misc', 'advanced', 'basic', 'arrows', 'arrows2',
+    'flowchart', 'er', 'uml', 'bpmn', 'bpmn2', 'dfd', 'c4', 'search', '.scratchpad'];
+
+  function restrictLibraries() {
+    var prototype = window.Sidebar && window.Sidebar.prototype;
+    if (prototype == null || prototype.__dshLibrariesRestricted) return;
+    prototype.__dshLibrariesRestricted = true;
+    prototype.enabledLibraries = libraryIds;
+    var showEntries = prototype.showEntries;
+    if (typeof showEntries !== 'function') return;
+    prototype.showEntries = function (entries, remember) {
+      var requested = entries;
+      if (requested == null) {
+        try {
+          if (typeof mxSettings !== 'undefined' && mxSettings.settings != null) {
+            requested = mxSettings.getLibraries();
+          }
+        } catch (error) { /* use the editor's defaults */ }
+        if (requested == null) requested = this.defaultEntries;
+      }
+      var allowed = String(requested || '').split(';').filter(function (id) {
+        return libraryIds.indexOf(id) >= 0;
+      }).join(';');
+      return showEntries.call(this, allowed, remember, true);
+    };
+  }
+
   var seen = new WeakSet();
 
   function capture(Original) {
@@ -312,6 +346,7 @@ const BODY = `
     window.__dshShimState.hooked = true;
     var captured = new Proxy(Original, {
       construct: function (target, args, newTarget) {
+        restrictLibraries();
         var instance = Reflect.construct(target, args, newTarget);
         try { install(instance); } catch (error) { /* never break construction */ }
         return instance;
@@ -319,6 +354,7 @@ const BODY = `
       // mxgraph subclasses by calling the base constructor on an existing receiver
       // -- EditorUi.call(this, ...) -- which is a plain call, not a construction.
       apply: function (target, receiver, args) {
+        restrictLibraries();
         var result = Reflect.apply(target, receiver, args);
         try { install(receiver); } catch (error) { /* never break construction */ }
         return result;

@@ -2,19 +2,9 @@
 
 English | [中文](README.zh.md)
 
-## Background: DeepSeek Harness
+Edit `.drawio` files in the DeepSeek Harness Web sidebar with a bundled, offline draw.io editor.
 
-DeepSeek Harness (`dsh`) is the open-source agent harness from DeepSeek AI, where nearly every capability is a plugin on [Cordis](https://github.com/cordiverse/cordis). It is in **developer preview** and iterating fast, so expect compatibility-breaking changes ([docs](https://deepseek-harness.github.io/deepseek-harness/), `0.1.7-alpha.*`); this plugin is a standalone third-party package that resolves `@deepseek-ai/*` from the running host.
-
-## The problem this plugin solves
-
-There was no way to edit a `.drawio` diagram inside DSH; this plugin opens it in the upstream draw.io editor in the Sidebar and writes every edit back to the same file.
-
-## Screenshots
-
-![The upstream draw.io editor with a .drawio file open](docs/example.png)
-
-The capture shows the vendored editor in a tab: `example.drawio` in the title bar with `All changes saved` after a write, draw.io's own shape panel on the left, and the file's diagram on the canvas.
+![A .drawio diagram open in the sidebar editor](docs/example.png)
 
 ## Install
 
@@ -22,46 +12,22 @@ The capture shows the vendored editor in a tab: `example.drawio` in the title ba
 npx @deepseek-ai/dsh plugin --profile web add @guowenzhang/dsh-drawioedit
 ```
 
-From the npm registry: <https://www.npmjs.com/package/@guowenzhang/dsh-drawioedit> — restart the host afterwards; local checkouts, git sources and troubleshooting are in [AGENTS.md](AGENTS.md).
+Restart the host after installation.
 
-## Usage
+## Features
 
-### Open a diagram in a tab
+- Open a `.drawio` file from the file tree in a sidebar tab; Chinese file names display correctly.
+- Edit and save automatically through the host's file service, subject to the session's workspace permissions. Failed or conflicting writes are shown in the tab.
+- Use **Save As** to rename the file in its current directory, or **Export as** to download a copy.
 
-Clicking a `.drawio` file in the file tree opens a Sidebar tab running the full upstream draw.io editor, labelled with the file's name instead of "Untitled Diagram". The tab has draw.io's own menus, toolbar, and shape panel; the file is read from the session's workspace, and nothing is written until you change something.
+## Bundled shapes and size
 
-### Save as you work
+General and basic shapes, arrows, flowcharts, ER, UML, BPMN, DFD, C4, freehand drawing, and sketch styling are available. Specialist cloud and network stencil packs are excluded; diagrams using them may display incorrectly.
 
-Every edit is written back to the same file the tab opened:
+The local package is **12.1 MB compressed / 42.7 MiB unpacked** (`npm pack --dry-run`). The published version may differ.
 
-| Action in the editor | What happens |
-|---|---|
-| Any edit | Written back within a second, with no dialog |
-| **Ctrl+S** | Written back immediately |
-| The toolbar **Save** button | Written back immediately |
-| **File → Save** and **File → Save As** | Written back to that same file |
-| The editor's own "Unsaved changes. Click here to save." notice | Written back immediately |
-
-**Export as** still downloads a copy, which is where a copy belongs. A write counts as saved only when the host confirms it, and that is when drawio's notice turns into "All changes saved"; if a write is refused — an agent edited the same file while the tab was open — the tab shows the reason above the editor instead of letting it claim success.
-
-### Know which file you are editing
-
-The diagram is named after the file the tab opened, so draw.io's title bar shows `example.drawio` rather than "Untitled Diagram". The tab holds exactly one file, so **Save As** writes that file back rather than creating a second one, and `Export as` is the way out of the workspace.
-
-## Notes and caveats
-
-- **The package is about 119 MB**, against about 1 MB for the read-only [dsh-drawio](https://github.com/zhang-guo-wen/dsh-drawio): the download carries the whole vendored editor.
-- **It depends on draw.io internals.** The editor is driven by a small script injected into its page, which hooks the editor class and the one method every save command funnels into; a draw.io upgrade that renames either breaks editing until this plugin follows. The mechanism, field by field, is in [AGENTS.md](AGENTS.md).
+Cloud integrations are disabled, so startup does not load third-party services.
 
 ## License
 
-Apache-2.0. The bundled editor is Apache-2.0 with additional terms on its icon sets and stencil libraries; see [NOTICE](NOTICE).
-
-Not affiliated with or endorsed by draw.io Ltd. "draw.io" is a trademark of draw.io Ltd. This package embeds their Apache-2.0 licensed editor.
-
-## Further reading
-
-- [AGENTS.md](AGENTS.md) — installation variants, the build, the iframe protocol, the vendored editor, the test suites, and troubleshooting.
-- [dsh-drawio](https://github.com/zhang-guo-wen/dsh-drawio) — the sibling preview plugin: read-only, maxGraph, about 1 MB instead of 119 MB.
-- [docs/example.drawio](docs/example.drawio) — the diagram in the screenshot, if you want a file to try editing.
-- [DeepSeek Harness documentation](https://deepseek-harness.github.io/deepseek-harness/).
+Apache-2.0. See [NOTICE](NOTICE) for bundled editor terms. Not affiliated with draw.io Ltd. Build and troubleshooting details are in [AGENTS.md](AGENTS.md).

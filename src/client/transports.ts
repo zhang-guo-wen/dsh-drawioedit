@@ -20,6 +20,8 @@ export interface OpenedDiagram {
    * passing the relative path back would target a different file.
    */
   readonly absolutePath: string
+  /** Session whose workspace and permission policy govern writes to this file. */
+  readonly sessionId: string
   /**
    * Opaque freshness token the host reported for the bytes just read.
    *
@@ -43,9 +45,11 @@ export interface EditorTransports {
    * @param absolutePath - the host-resolved absolute path of the file.
    * @param xml - the diagram XML the editor reported.
    * @param version - the freshness token the previous read or write reported.
+   * @param sessionId - the session whose workspace policy applies to this file.
    * @returns the freshness token the write produced, for the next save.
    */
-  readonly save: (absolutePath: string, xml: string, version: string) => Promise<string>
+  readonly save: (absolutePath: string, xml: string, version: string, sessionId: string) => Promise<string>
+  readonly rename: (absolutePath: string, name: string, version: string, sessionId: string) => Promise<{ path: string; version: string }>
 }
 
 let installed: EditorTransports | undefined
