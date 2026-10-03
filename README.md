@@ -2,7 +2,7 @@
 
 English | [中文](README.zh.md)
 
-Edit `.drawio` files in the DeepSeek Harness Web sidebar with a bundled, offline draw.io editor.
+Edit `.drawio` diagrams in the DeepSeek Harness Web Sidebar with a bundled offline draw.io editor
 
 ![A .drawio diagram open in the sidebar editor](docs/example.png)
 

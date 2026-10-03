@@ -2,7 +2,7 @@
 
 [English](README.md) | 中文
 
-在 DeepSeek Harness Web 侧栏使用随包提供的离线 draw.io 编辑器编辑 `.drawio` 文件。
+在 DeepSeek Harness Web 侧边栏中用随包分发的离线 draw.io 编辑器编辑 `.drawio` 图表
 
 ![侧栏编辑器中打开的 .drawio 图表](docs/example.png)
 
