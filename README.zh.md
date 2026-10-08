@@ -4,6 +4,8 @@
 
 将上游 draw.io 编辑器裁剪并集成到 DeepSeek Harness Web 侧边栏，支持离线编辑 `.drawio` 图表，并将改动自动保存回原文件。
 
+插件列表的显示名称与介绍支持英文和中文，随 Harness 语言设置显示，英文为默认回退；英文名称为去掉 npm scope 的原包名，中文名称说明用途，安装仍使用不变的真实包名。
+
 ![侧栏编辑器中打开的 .drawio 图表](docs/example.png)
 
 ## 安装

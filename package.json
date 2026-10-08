@@ -21,7 +21,8 @@
       "default": "./lib/client.js"
     },
     "./package.json": "./package.json",
-    "./cordis.patch.yml": "./cordis.patch.yml"
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./locale/*": "./locale/*"
   },
   "engines": {
     "dsh": ">=0.1.7-0"
@@ -41,6 +42,7 @@
     }
   },
   "files": [
+    "locale",
     "editor",
     "lib/*.mjs",
     "lib/client.js",
@@ -52,6 +54,7 @@
     "NOTICE"
   ],
   "scripts": {
+    "test:metadata": "node --test tests/plugin-metadata.test.mjs",
     "build": "tsdown -c tsdown.config.ts && node build-client.mjs && node build-stencils.mjs",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "node tests/artifact.mjs && node tests/stencils.mjs && node tests/editor-assets.mjs && node tests/smoke.mjs && node tests/serve.mjs && node tests/save.mjs && node tests/rename.mjs && node tests/shim.mjs && node tests/shimdelivery.mjs && node tests/boot.mjs && node tests/offline.mjs",

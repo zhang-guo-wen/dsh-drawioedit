@@ -4,6 +4,8 @@ English | [中文](README.zh.md)
 
 A trimmed upstream draw.io editor integrated into the DeepSeek Harness Web Sidebar, with offline `.drawio` editing and automatic saving back to the original file.
 
+In the plugin list, display names and descriptions follow the Harness language setting in English or Chinese (English is the default fallback); English names use the package name without its npm scope, Chinese names describe the purpose, and installation still uses the unchanged real package name.
+
 ![A .drawio diagram open in the sidebar editor](docs/example.png)
 
 ## Install
