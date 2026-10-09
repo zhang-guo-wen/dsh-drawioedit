@@ -1,7 +1,7 @@
 {
   "name": "@guowenzhang/dsh-drawioedit",
   "description": "Edit .drawio diagrams in the DeepSeek Harness Web Sidebar with a bundled offline draw.io editor",
-  "version": "1.1.1",
+  "version": "1.2.0",
   "private": false,
   "type": "module",
   "license": "Apache-2.0",
