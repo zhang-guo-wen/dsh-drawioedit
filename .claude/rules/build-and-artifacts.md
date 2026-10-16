@@ -1,4 +1,12 @@
-# rules/build-and-artifacts.md —— 覆盖：构建链路、浏览器半边打包策略与 `lib/` 产物要求；何时读：改构建脚本或依赖解析、调整产物、排查产物加载失败时
+---
+paths:
+  - "lib/**"
+  - "build-client.mjs"
+  - "tsdown.config.ts"
+  - "package.json"
+---
+
+> 覆盖：构建链路、浏览器半边打包策略与 `lib/` 产物要求；何时读：改构建脚本或依赖解析、调整产物、排查产物加载失败时
 
 ## 构建
 

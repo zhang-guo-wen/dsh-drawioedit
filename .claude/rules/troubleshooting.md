@@ -1,4 +1,10 @@
-# rules/troubleshooting.md —— 覆盖：`window.__dshShimState` 诊断字段与判断层次；何时读：编辑器打不开、不保存、停在 splash 或怀疑 host 是旧版本时
+---
+paths:
+  - "src/**"
+  - "src/client/**"
+---
+
+> 覆盖：`window.__dshShimState` 诊断字段与判断层次；何时读：编辑器打不开、不保存、停在 splash 或怀疑 host 是旧版本时
 
 ## 排查（诊断）
 

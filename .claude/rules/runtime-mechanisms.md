@@ -1,4 +1,10 @@
-# rules/runtime-mechanisms.md —— 覆盖：编辑器加载、读取、保存与 shim 的技术决策和机制；何时读：改加载路径、读取、保存、沙箱或 shim 行为之前
+---
+paths:
+  - "src/*.ts"
+  - "src/client/**"
+---
+
+> 覆盖：编辑器加载、读取、保存与 shim 的技术决策和机制；何时读：改加载路径、读取、保存、沙箱或 shim 行为之前
 
 （原文「技术决策与机制」一节；其中 `editor/` 裁剪部分见 [`editor-assets.md`](editor-assets.md)。）
 

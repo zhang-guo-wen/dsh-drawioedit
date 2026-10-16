@@ -1,4 +1,10 @@
-# rules/editor-assets.md —— 覆盖：随包 `editor/` 上游资源的裁剪范围、保留项与体积；何时读：改 `editor/` 或 `build-stencils.mjs`、升级 drawio webapp、排查图形库/模板缺失或打包体积时
+---
+paths:
+  - "editor/**"
+  - "build-stencils.mjs"
+---
+
+> 覆盖：随包 `editor/` 上游资源的裁剪范围、保留项与体积；何时读：改 `editor/` 或 `build-stencils.mjs`、升级 drawio webapp、排查图形库/模板缺失或打包体积时
 
 ## editor/ 的裁剪
 

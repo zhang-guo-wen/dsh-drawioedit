@@ -1,4 +1,11 @@
-# rules/wiring-and-deploy.md —— 覆盖：组合接线（profile 层、扩展点契约、inject 服务）与安装/生效语义；何时读：安装、卸载、改 `cordis.patch.yml` 或 `dsh` 字段，或遇到「改了却不生效」时
+---
+paths:
+  - "cordis.patch.yml"
+  - "package.json"
+  - "README.md"
+---
+
+> 覆盖：组合接线（profile 层、扩展点契约、inject 服务）与安装/生效语义；何时读：安装、卸载、改 `cordis.patch.yml` 或 `dsh` 字段，或遇到「改了却不生效」时
 
 ## 组合接线
 

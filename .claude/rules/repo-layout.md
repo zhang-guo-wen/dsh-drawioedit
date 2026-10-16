@@ -1,4 +1,16 @@
-# rules/repo-layout.md —— 覆盖：仓库定位与各文件/目录职责；何时读：新增、移动或重命名文件，判断代码该落在 host 还是 client 半边，或确认某个模块导出什么时
+---
+paths:
+  - "src/**"
+  - "tests/**"
+  - "editor/**"
+  - "docs/**"
+  - "lib/**"
+  - "package.json"
+  - "cordis.patch.yml"
+  - "README.md"
+---
+
+> 覆盖：仓库定位与各文件/目录职责；何时读：新增、移动或重命名文件，判断代码该落在 host 还是 client 半边，或确认某个模块导出什么时
 
 ## 目录
 
@@ -16,4 +28,4 @@
 - `cordis.patch.yml` —— 把插件行插入组合的 bundle 层。
 - `docs/example.png` / `docs/example.drawio` —— README 的截图与它的源文件。
 - `tests/` —— 十一个套件（`npm test`）与不进套件的 `tests/debug/`。
-- `rules/` —— `AGENTS.md` 的明细分册，按需读取；**不在** `package.json` 的 `files` 里，因此不随 npm 包分发（放包根而不是 `docs/`：`files` 包含整个 `docs`）。
+- `.claude/rules/` —— `AGENTS.md` 的明细分册，按需读取；**不在** `package.json` 的 `files` 里，因此不随 npm 包分发（放包根而不是 `docs/`：`files` 包含整个 `docs`）。

@@ -6,7 +6,7 @@
 姊妹插件：[`dsh-drawio`](../dsh-drawio)（用 maxGraph 只读预览 `.drawio`，约 1 MB，而本仓因为带上游编辑器，解包后约 43 MiB）。
 两者互不 import、互不依赖，可单独安装；渲染与编辑能力因此不共享任何代码，只有文件格式是共同的。
 
-**本文件只是导航页**：只放定位、目录、命令与红线，明细按需读包根 `rules/`（索引见文末「详细规则」）。
+**本文件只是导航页**：只放定位、目录、命令与红线，明细按需读包根 `.claude/rules/`（索引见文末「详细规则」）。
 
 ## 目录
 
@@ -15,12 +15,12 @@
 
 - `src/` —— host 半边：`index.ts`（入口与 re-export）、`serve.ts`（编辑器前缀路由）、`save.ts`（保存端点）、`shim.ts`（注入编辑器页面的 shim）、`params.ts`（编辑器 URL 与云集成清单）。
 - `src/client/` —— 浏览器半边：`index.ts`、`EditorBody.tsx`、`transports.ts`、`editor.ts`、`locales.ts`、`EditorBody.module.css`。
-- `editor/` —— 随包的上游 drawio webapp（裁剪说明见 [`rules/editor-assets.md`](rules/editor-assets.md)）；`build-stencils.mjs` 从保留的 XML 重建 `editor/js/stencils.min.js`。
+- `editor/` —— 随包的上游 drawio webapp（裁剪说明见 [`.claude/rules/editor-assets.md`](.claude/rules/editor-assets.md)）；`build-stencils.mjs` 从保留的 XML 重建 `editor/js/stencils.min.js`。
 - `lib/` —— 构建产物：**已提交进仓库**（`index.mjs` host + `client.js` 浏览器 handoff），`lib/index.mjs` 里内嵌了 shim 源码。
 - `cordis.patch.yml` —— 把插件行插入组合的 bundle 层；`docs/` —— README 的截图与它的源文件。
-- `tests/` —— 套件（`npm test`）与不进套件的 `tests/debug/`；`rules/` —— 本文件的明细分册（**不在** `package.json` 的 `files` 里，因此不随 npm 包分发）。
+- `tests/` —— 套件（`npm test`）与不进套件的 `tests/debug/`；`.claude/rules/` —— 本文件的明细分册（**不在** `package.json` 的 `files` 里，因此不随 npm 包分发）。
 
-每个文件的职责、导出与边界见 [`rules/repo-layout.md`](rules/repo-layout.md)。
+每个文件的职责、导出与边界见 [`.claude/rules/repo-layout.md`](.claude/rules/repo-layout.md)。
 
 ## 构建与测试命令
 
@@ -32,7 +32,7 @@ npm test           # 无需密钥的套件，其中 boot 与 offline 驱动真�
 npm run test:metadata  # node --test tests/plugin-metadata.test.mjs
 ```
 
-`boot` / `offline` 默认按平台查找 Chrome，装在别处用 `CHROME_PATH` 指定；找不到可执行文件时探针打印原因并以 2 退出。`prepublishOnly` 只跑 `artifact`、`stencils`、`editor-assets`、`smoke`，发布前的手工检查仍以 `npm test` 为准。构建链路与各套件的分工见 [`rules/build-and-artifacts.md`](rules/build-and-artifacts.md) 与 [`rules/tests-and-browser.md`](rules/tests-and-browser.md)。
+`boot` / `offline` 默认按平台查找 Chrome，装在别处用 `CHROME_PATH` 指定；找不到可执行文件时探针打印原因并以 2 退出。`prepublishOnly` 只跑 `artifact`、`stencils`、`editor-assets`、`smoke`，发布前的手工检查仍以 `npm test` 为准。构建链路与各套件的分工见 [`.claude/rules/build-and-artifacts.md`](.claude/rules/build-and-artifacts.md) 与 [`.claude/rules/tests-and-browser.md`](.claude/rules/tests-and-browser.md)。
 
 ## 硬约束
 
@@ -49,18 +49,18 @@ npm run test:metadata  # node --test tests/plugin-metadata.test.mjs
 11. **云集成只能经 `src/params.ts` 的 `DISABLED_INTEGRATIONS` 关闭**，清单只有一个家（host 的 `editorUrl()`、`tests/offline.mjs` 的宿主页与生产 body 共用同一构造器）；编辑器启动全程不得出现任何远程主机。
 12. **新增 UI 文案必须同时进 `src/client/locales.ts` 的 `zh` 与 `en`**，不写死字符串；`EditorBody` 里 JSX 引用但 CSS 未定义的类同样静默无样式。
 13. **访问未 inject 的服务用 `ctx.get('x')`**，不用 `ctx.x` 属性访问。
-14. **发版 = 改版本号 + 构建 + 提交产物 + 打 tag。** 未经用户明确要求不递增版本号、不打 tag、不推送；步骤见 [`rules/release.md`](rules/release.md)。
+14. **发版 = 改版本号 + 构建 + 提交产物 + 打 tag。** 未经用户明确要求不递增版本号、不打 tag、不推送；步骤见 [`.claude/rules/release.md`](.claude/rules/release.md)。
 
 ## 详细规则
 
-按需读取，不要把 `rules/` 当成默认上下文。
+明细放 `.claude/rules/`，按 `paths:` 路径作用域加载：每个文件都带非空 `paths:`（项目根相对、正斜杠的 picomatch glob），只有 `read` 读到命中这些 glob 的文件后，才在**下一次请求**折入上下文，每条规则每会话至多一次；**没有 `paths:`（或为空）的规则会像 `CLAUDE.md` 一样每次会话都注入**，所以明细一律必须带 `paths:`。按需读取，不要把 `.claude/rules/` 当成默认上下文。
 
-- [rules/repo-layout.md](rules/repo-layout.md)：仓库布局与每个文件/目录的职责；新增、移动文件或判断代码归 host 还是 client 时读。
-- [rules/runtime-mechanisms.md](rules/runtime-mechanisms.md)：同源 iframe、`#P`+`#R` 加载、读取与保存链、shim 原理与注入位置；改加载/读取/保存/shim 前必读。
-- [rules/editor-assets.md](rules/editor-assets.md)：`editor/` 上游资源裁剪、stencils 重建、模板索引与必须保留项；改 `editor/`、升级 drawio 或排查图形库缺失时读。
-- [rules/build-and-artifacts.md](rules/build-and-artifacts.md)：tsdown / rolldown 构建链路、`platform: 'browser'` 与 external 策略、`lib/` 与 typecheck 边界；改构建或产物加载失败时读。
-- [rules/wiring-and-deploy.md](rules/wiring-and-deploy.md)：`cordis.patch.yml` 接线、`dsh` 字段与 sidebar-right 契约、安装/卸载命令与生效语义；安装或「改了不生效」时读。
-- [rules/release.md](rules/release.md)：发版步骤、tag 与安装验证；准备发版时读。
-- [rules/tests-and-browser.md](rules/tests-and-browser.md)：各套件证明什么、真实浏览器驱动与 `tests/debug/`；改测试或决定补哪个套件时读。
-- [rules/troubleshooting.md](rules/troubleshooting.md)：`window.__dshShimState` 字段表与判断层次；编辑器打不开、不保存、停在 splash 时读。
-- [rules/pitfalls.md](rules/pitfalls.md)：14 条易崩清单（改错就坏且多数不立刻报错）；动手前对照、评审时逐条核。
+- [.claude/rules/repo-layout.md](.claude/rules/repo-layout.md)：仓库布局与每个文件/目录的职责；新增、移动文件或判断代码归 host 还是 client 时读。
+- [.claude/rules/runtime-mechanisms.md](.claude/rules/runtime-mechanisms.md)：同源 iframe、`#P`+`#R` 加载、读取与保存链、shim 原理与注入位置；改加载/读取/保存/shim 前必读。
+- [.claude/rules/editor-assets.md](.claude/rules/editor-assets.md)：`editor/` 上游资源裁剪、stencils 重建、模板索引与必须保留项；改 `editor/`、升级 drawio 或排查图形库缺失时读。
+- [.claude/rules/build-and-artifacts.md](.claude/rules/build-and-artifacts.md)：tsdown / rolldown 构建链路、`platform: 'browser'` 与 external 策略、`lib/` 与 typecheck 边界；改构建或产物加载失败时读。
+- [.claude/rules/wiring-and-deploy.md](.claude/rules/wiring-and-deploy.md)：`cordis.patch.yml` 接线、`dsh` 字段与 sidebar-right 契约、安装/卸载命令与生效语义；安装或「改了不生效」时读。
+- [.claude/rules/release.md](.claude/rules/release.md)：发版步骤、tag 与安装验证；准备发版时读。
+- [.claude/rules/tests-and-browser.md](.claude/rules/tests-and-browser.md)：各套件证明什么、真实浏览器驱动与 `tests/debug/`；改测试或决定补哪个套件时读。
+- [.claude/rules/troubleshooting.md](.claude/rules/troubleshooting.md)：`window.__dshShimState` 字段表与判断层次；编辑器打不开、不保存、停在 splash 时读。
+- [.claude/rules/pitfalls.md](.claude/rules/pitfalls.md)：14 条易崩清单（改错就坏且多数不立刻报错）；动手前对照、评审时逐条核。
