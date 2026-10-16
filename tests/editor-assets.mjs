@@ -40,7 +40,11 @@ for (const template of templates) {
   }
 }
 for (const name of ['cloud', 'network']) {
-  const files = readdirSync(join(editor, 'templates', name), { recursive: true })
+  // The specialist gallery was removed outright, so the directory may be gone
+  // rather than empty; both are the absence this asserts, and only the empty
+  // case can be read.
+  const directory = join(editor, 'templates', name)
+  const files = (existsSync(directory) ? readdirSync(directory, { recursive: true }) : [])
     .filter((entry) => entry.endsWith('.xml') || entry.endsWith('.png'))
   assert.deepEqual(files, [], `${name} templates still ship`)
 }

@@ -137,27 +137,74 @@ assert.equal(ready.absolutePath, ABSOLUTE_PATH, 'the host-resolved path must rea
 assert.equal(ready.sessionId, 'session-1', 'the editor must retain the read session for its save policy')
 assert.equal(ready.version, VERSION, 'the freshness token must reach the save')
 
-// Render the ready body once: the tab address is percent-encoded, while the
-// draw.io filename and the accessible iframe title must show readable Chinese.
-let stateIndex = 0
-react.useState = (initial) => [stateIndex++ === 0 ? ready : initial, () => {}]
+// Render the body with one state slot forced and the rest left at their initial
+// values. The slot indices follow EditorBody's own state order:
+//   0 loaded · 1 failure · 2 write phase · 3 read attempt
+// so inserting a state ahead of one of them fails this suite rather than
+// silently rendering the wrong fixture.
+function renderWith(forced) {
+  let index = 0
+  react.useState = (initial) => {
+    const at = index++
+    return [Object.hasOwn(forced, at) ? forced[at] : initial, () => {}]
+  }
+  return registered.body.component({ useTabInfo: () => ({ tab }), t: localized })
+}
+
+function childrenOf(rendered) {
+  return Array.isArray(rendered.props.children) ? rendered.props.children : [rendered.props.children]
+}
+
 const localized = (key, params) => registered.dictionaries.dictionaries.zh[key]
   .replace('{name}', params?.name ?? '{name}')
-const rendered = registered.body.component({ useTabInfo: () => ({ tab }), t: localized })
-const children = Array.isArray(rendered.props.children) ? rendered.props.children : [rendered.props.children]
+
+// The ready body: the tab address is percent-encoded, while the draw.io filename
+// and the accessible iframe title must show readable Chinese.
+const children = childrenOf(renderWith({ 0: ready }))
 const frame = children.find((child) => child?.type === 'iframe')
 assert.ok(frame, 'the ready body must render the editor frame')
 const params = JSON.parse(decodeURIComponent(frame.props.src.split('#P')[1]))
 assert.equal(params.dshTitle, 'AI员工架构图.drawio', 'draw.io must receive the decoded filename')
 assert.ok(frame.props.title.includes('AI员工架构图.drawio'), 'the iframe title must show readable Chinese')
 
-stateIndex = 0
-react.useState = (initial) => [stateIndex++ === 0 ? ready : { code: 'FS_SANDBOX_DENIED', message: 'raw sandbox error' }, () => {}]
-const denied = registered.body.component({ useTabInfo: () => ({ tab }), t: localized })
-const deniedChildren = Array.isArray(denied.props.children) ? denied.props.children : [denied.props.children]
+// A write in flight is one of the three visible write states: it must be
+// announced, and the frame must report itself busy.
+const saving = childrenOf(renderWith({ 0: ready, 2: 'saving' }))
+const savingLine = saving.find((child) => child?.props?.role === 'status')
+assert.ok(savingLine, 'a write in flight must be announced')
+assert.equal(savingLine.props['data-phase'], 'saving', 'the announced phase must be the save')
+assert.ok(savingLine.props.children.includes('正在保存'), 'the announcement must be localized')
+const savingFrame = saving.find((child) => child?.type === 'iframe')
+assert.ok(savingFrame, 'the editor frame must stay mounted while a write is in flight')
+
+// A confirmed write is the third state, and it names itself distinctly.
+const saved = childrenOf(renderWith({ 0: ready, 2: 'saved' }))
+assert.ok(
+  saved.find((child) => child?.props?.role === 'status')?.props?.children?.includes('已保存'),
+  'a confirmed write must be announced as saved',
+)
+
+// A rejected save keeps its localized reason.
+const deniedChildren = childrenOf(renderWith({ 0: ready, 1: { code: 'FS_SANDBOX_DENIED', message: 'raw sandbox error' } }))
 const alert = deniedChildren.find((child) => child?.props?.role === 'alert')
 assert.ok(alert, 'a rejected save must show an alert')
 assert.ok(alert.props.children.includes('修改尚未保存'), 'the alert must explain that edits were not saved')
 assert.ok(!alert.props.children.includes('raw sandbox error'), 'the alert must localize sandbox errors')
+
+// A pending read is the placeholder the tab shows first, and it announces itself.
+const loadingRender = renderWith({})
+assert.equal(loadingRender.props.role, 'status', 'a pending read must announce itself')
+assert.ok(
+  childrenOf(loadingRender).some((child) => child?.props?.className?.includes('skeleton')),
+  'a pending read must show the placeholder',
+)
+
+// A failed read offers the read again, in the same place as the failure.
+const failedRender = renderWith({ 0: { kind: 'failed', address: tab.contentId, reason: 'read refused' } })
+assert.equal(failedRender.props.role, 'alert', 'a failed read must show an alert')
+assert.ok(
+  childrenOf(failedRender).some((child) => child?.props?.className?.includes('retry')),
+  'a failed read must offer a retry',
+)
 
 console.log('OK: no node-core request; registers the tab type, the body, and reads the diagram through readBytes')

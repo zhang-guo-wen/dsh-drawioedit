@@ -12,18 +12,104 @@
   width: 100%;
   min-height: 0;
   border: 0;
-  background: var(--dsw-color-surface, #ffffff);
+  /* The surface behind the editor document while it starts. */
+  background: var(--dsw-alias-bg-layer-1);
 }
 
 .status {
   display: block;
+  margin: 0;
   padding: 12px;
-  color: var(--dsw-color-text-secondary);
-  font-size: 13px;
+  color: var(--dsw-alias-label-secondary);
+  font: var(--dsw-font-xs-13);
+}
+
+/* First paint: the frame's own geometry, so the tab does not jump when the
+   editor document arrives. */
+.loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  height: 100%;
+  box-sizing: border-box;
+  padding: 24px 12px;
+}
+
+.skeleton {
+  width: min(100%, 480px);
+  height: 240px;
+  border-radius: var(--dsw-radius-lg);
+  background: var(--dsw-alias-bg-skeleton);
+  animation: drawioEditSkeletonPulse 1.4s var(--ds-ease-in-out) infinite;
+}
+
+/* A read that failed keeps the reason and the way out together. */
+.failure {
+  display: grid;
+  gap: 8px;
+  justify-items: start;
+  padding: 12px;
+}
+
+.retry {
+  box-sizing: border-box;
+  height: 28px;
+  padding: 0 12px;
+  border: .5px solid var(--dsw-alias-border-l3);
+  border-radius: var(--dsw-radius-md);
+  background: transparent;
+  color: var(--dsw-alias-label-primary);
+  font: var(--dsw-font-xs-13);
+  cursor: pointer;
+}
+
+.retry:hover {
+  border-color: var(--dsw-alias-border-l4);
+}
+
+.retry:focus-visible {
+  outline: var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary));
+  outline-offset: 2px;
+}
+
+/* This plugin's own write state. The editor reports its own "All changes saved"
+   in its toolbar, so this line names the write this plugin performed and stays
+   out of the way once it is confirmed. */
+.writeState {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 4px 12px;
+  color: var(--dsw-alias-label-secondary);
+  font: var(--dsw-font-xs-13);
+}
+
+.writeState[data-phase='saved'] {
+  color: var(--dsw-alias-state-success-primary);
 }
 
 .error {
-  color: #8f2e20;
-  background: #fff3ef;
-  border-bottom: 1px solid #f1c7bc;
+  color: var(--dsw-alias-state-error-primary);
+  background: var(--dsw-alias-bg-layer-2);
+  border-bottom: 1px solid var(--dsw-alias-state-error-primary);
+}
+
+/* Touch hardware: the same control, at a target a finger can hit. */
+@media (pointer: coarse) {
+  .retry {
+    min-height: 44px;
+  }
+}
+
+@keyframes drawioEditSkeletonPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: .55; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton {
+    animation: none;
+  }
 }

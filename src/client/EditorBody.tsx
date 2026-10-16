@@ -11,6 +11,16 @@ import css from './EditorBody.module.css'
 /** The tab seat's standard props plus this entry's dictionary. */
 export type EditorBodyProps = PropsRuntime<'sidebar.right.pane.tab'> & PropsLocale<'sidebarDrawioEdit'>
 
+/** How long a confirmed write is announced before the editor's own status owns it. */
+const SAVED_HOLD_MS = 2000
+
+/**
+ * This plugin's own write phase, shown above the frame. The editor reports its
+ * own "All changes saved", so this line speaks only for the write this plugin
+ * performed: which one is in flight, and whether it landed.
+ */
+type WritePhase = 'saving' | 'renaming' | 'saved'
+
 type Loaded =
   | {
     readonly kind: 'ready'
@@ -37,6 +47,10 @@ export function EditorBody({ useTabInfo, t }: EditorBodyProps): ReactNode {
   const [loaded, setLoaded] = useState<Loaded>()
   /** Why the last write failed. A write that lands is reported by the editor itself. */
   const [failure, setFailure] = useState<{ readonly message: string; readonly code: string | undefined }>()
+  /** The visible phase of this plugin's own write, and nothing else. */
+  const [phase, setPhase] = useState<WritePhase>()
+  /** Bumped by Retry to read the same file again. */
+  const [attempt, setAttempt] = useState(0)
   const frame = useRef<HTMLIFrameElement>(null)
   /** The freshness token to offer on the next save: seeded by the read, advanced by each write. */
   const version = useRef<string>('')
@@ -45,11 +59,14 @@ export function EditorBody({ useTabInfo, t }: EditorBodyProps): ReactNode {
   const saving = useRef(false)
   const renameWanted = useRef<string | undefined>(undefined)
   const renaming = useRef(false)
-  const [renameBusy, setRenameBusy] = useState(false)
+  const busy = phase === 'saving' || phase === 'renaming'
 
   useEffect(() => {
     const lifetime = new AbortController()
     const signal = AbortSignal.any([lifetime.signal, tab.signal])
+    // A retry, or a different tab address, starts from the placeholder rather than
+    // leaving the previous file's failure on screen.
+    setLoaded(undefined)
     /** Report a read failure; the reason is shown so the pane is never silent. */
     const failed = (error: unknown): void => {
       if (signal.aborted) return
@@ -73,7 +90,15 @@ export function EditorBody({ useTabInfo, t }: EditorBodyProps): ReactNode {
     // escape as an unhandled rejection and leave the pane on the loading line.
     ).catch(failed)
     return () => { lifetime.abort() }
-  }, [address, tab.signal])
+  }, [address, tab.signal, attempt])
+
+  // A confirmed write is announced for a moment; after that the editor's own
+  // toolbar is the status and a second line would only repeat it.
+  useEffect(() => {
+    if (phase !== 'saved') return undefined
+    const timer = setTimeout(() => { setPhase(current => current === 'saved' ? undefined : current) }, SAVED_HOLD_MS)
+    return () => { clearTimeout(timer) }
+  }, [phase])
 
   useEffect(() => {
     if (loaded?.kind !== 'ready') return
@@ -84,14 +109,14 @@ export function EditorBody({ useTabInfo, t }: EditorBodyProps): ReactNode {
       const requested = renameWanted.current
       renameWanted.current = undefined
       renaming.current = true
-      setRenameBusy(true)
+      setPhase('renaming')
       void editorTransports().rename(absolutePath, requested, version.current, loaded.sessionId).then(result => {
         tab.actions.openResource(fileAddressFor(loaded.sessionId, undefined, result.path), { replaceTab: true })
       }).catch((error: unknown) => {
         setFailure({ message: `${t('renameFailed')}${error instanceof Error ? error.message : String(error)}`, code: error instanceof DiagramSaveError ? error.code : undefined })
       }).finally(() => {
         renaming.current = false
-        setRenameBusy(false)
+        setPhase(current => current === 'renaming' ? undefined : current)
         drain()
       })
     }
@@ -113,12 +138,14 @@ export function EditorBody({ useTabInfo, t }: EditorBodyProps): ReactNode {
       const xml = pending.current.xml
       pending.current = undefined
       saving.current = true
+      setPhase('saving')
       void editorTransports().save(absolutePath, xml, version.current, loaded.sessionId).then(
         // Each write yields the token the next one must offer, so a write by
         // anyone else in between is refused rather than overwritten.
         (next) => {
           version.current = next
           setFailure(undefined)
+          setPhase('saved')
           // The write is the host's, and drawio has no other way to learn it landed.
           // Without this it keeps showing "Unsaved changes. Click here to save."
           // Whether or not the file was written, so a success looks like a failure.
@@ -126,6 +153,7 @@ export function EditorBody({ useTabInfo, t }: EditorBodyProps): ReactNode {
         },
         (error: unknown) => {
           renameWanted.current = undefined
+          setPhase(current => current === 'saving' ? undefined : current)
           setFailure({
             message: error instanceof Error ? error.message : String(error),
             code: error instanceof DiagramSaveError ? error.code : undefined,
@@ -171,22 +199,33 @@ export function EditorBody({ useTabInfo, t }: EditorBodyProps): ReactNode {
   )
 
   if (loaded === undefined || loaded.address !== address) {
-    return <p className={css.status} role="status">{t('loading')}</p>
+    return <div className={css.loading} role="status">
+      {/* The placeholder is decoration; the status line carries the meaning. */}
+      <span className={css.skeleton} aria-hidden="true" />
+      <p className={css.status}>{t('loading')}</p>
+    </div>
   }
   if (loaded.kind === 'failed') {
-    return <p className={css.status} role="alert">{`${t('failed')} ${loaded.reason}`}</p>
+    return <div className={css.failure} role="alert">
+      <p className={css.status}>{`${t('failed')} ${loaded.reason}`}</p>
+      {/* A read can fail for a reason that does not repeat, and this tab is the
+          only place that can offer the same file again. */}
+      <button type="button" className={css.retry} onClick={() => setAttempt(current => current + 1)}>
+        {t('retry')}
+      </button>
+    </div>
   }
-  // Only a failure earns a line of its own: a confirmed write makes drawio's own
-  // toolbar say "All changes saved", so a second line above the frame answers a
-  // question the editor has already answered.
-  return <div className={css.frame} data-drawio-editor aria-busy={renameBusy}>
+  // Two lines at most, and each answers a question the editor does not: the
+  // plugin's own write phase, and a write that was refused.
+  return <div className={css.frame} data-drawio-editor aria-busy={busy}>
+    {phase !== undefined && <p className={css.writeState} data-phase={phase} role="status">{t(phase)}</p>}
     {failure !== undefined && <p className={`${css.status} ${css.error}`} role="alert">
       {`${t('saveFailed')}${failureDetail}`}
     </p>}
     <iframe
       ref={frame}
       className={css.editor}
-      style={renameBusy ? { pointerEvents: 'none' } : undefined}
+      style={phase === 'renaming' ? { pointerEvents: 'none' } : undefined}
       src={src}
       title={t('preview', { name })}
       // The editor is this plugin's own code, served from the application origin,
