@@ -6,7 +6,8 @@
 npm install
 npm run build      # tsdown（host） + node build-client.mjs（client） + node build-stencils.mjs
 npm run typecheck  # tsc --noEmit -p tsconfig.json，针对「已发布」的 @deepseek-ai/* 包
-npm test           # 八个无需密钥的套件，其中两个驱动真实浏览器
+npm test           # 十一个无需密钥的套件，其中两个驱动真实浏览器
+npm run test:metadata  # node --test tests/plugin-metadata.test.mjs，独立入口、不进 npm test
 ```
 
 - host：`tsdown` 打 `src/index.ts` → `lib/index.mjs`，`tsdown.config.ts` 里 `deps.neverBundle: [/^@deepseek-ai\//]` 让所有 `@deepseek-ai/*` 保持 external。
