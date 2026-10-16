@@ -155,7 +155,9 @@ function childrenOf(rendered) {
   return Array.isArray(rendered.props.children) ? rendered.props.children : [rendered.props.children]
 }
 
-const localized = (key, params) => registered.dictionaries.dictionaries.zh[key]
+// A key the dictionary does not carry reads as the key itself, the way the
+// locale binding behaves, so a stale phase cannot crash a render.
+const localized = (key, params) => (registered.dictionaries.dictionaries.zh[key] ?? key)
   .replace('{name}', params?.name ?? '{name}')
 
 // The ready body: the tab address is percent-encoded, while the draw.io filename
@@ -167,21 +169,47 @@ const params = JSON.parse(decodeURIComponent(frame.props.src.split('#P')[1]))
 assert.equal(params.dshTitle, 'AI员工架构图.drawio', 'draw.io must receive the decoded filename')
 assert.ok(frame.props.title.includes('AI员工架构图.drawio'), 'the iframe title must show readable Chinese')
 
-// A write in flight is one of the three visible write states: it must be
+// A write in flight is one of the two visible write states: it must be
 // announced, and the frame must report itself busy.
 const saving = childrenOf(renderWith({ 0: ready, 2: 'saving' }))
 const savingLine = saving.find((child) => child?.props?.role === 'status')
 assert.ok(savingLine, 'a write in flight must be announced')
-assert.equal(savingLine.props['data-phase'], 'saving', 'the announced phase must be the save')
 assert.ok(savingLine.props.children.includes('正在保存'), 'the announcement must be localized')
 const savingFrame = saving.find((child) => child?.type === 'iframe')
 assert.ok(savingFrame, 'the editor frame must stay mounted while a write is in flight')
 
-// A confirmed write is the third state, and it names itself distinctly.
-const saved = childrenOf(renderWith({ 0: ready, 2: 'saved' }))
-assert.ok(
-  saved.find((child) => child?.props?.role === 'status')?.props?.children?.includes('已保存'),
-  'a confirmed write must be announced as saved',
+// The write phase has no "saved" value and no dictionary entry for one: the
+// confirmed write belongs to drawio's own toolbar, so the pane draws a line only
+// for a write in flight and a rename. Both halves are pinned here -- the bundle
+// the browser loads rejects a phase for a landed write, and neither dictionary
+// carries copy for one.
+for (const [language, dictionary] of Object.entries(registered.dictionaries.dictionaries)) {
+  assert.equal(
+    dictionary.saved,
+    undefined,
+    `the ${language} dictionary must not carry a saved label for the pane to draw`,
+  )
+}
+assert.match(
+  source,
+  /setPhase\(void 0\)/u,
+  'a write that landed must clear the phase rather than announce itself',
+)
+
+// Whatever phase is settled -- the initial one, or a stale value this build no
+// longer produces -- nothing is drawn above the frame and the frame stays mounted.
+for (const phase of [undefined, 'saved']) {
+  const settled = childrenOf(renderWith({ 0: ready, 2: phase }))
+  assert.ok(
+    settled.some((child) => child?.type === 'iframe'),
+    `the editor frame must stay mounted for phase ${String(phase)}`,
+  )
+}
+const settledPane = childrenOf(renderWith({ 0: ready, 2: undefined }))
+assert.equal(
+  settledPane.find((child) => child?.props?.role === 'status'),
+  undefined,
+  'a settled pane must draw nothing above the frame',
 )
 
 // A rejected save keeps its localized reason.

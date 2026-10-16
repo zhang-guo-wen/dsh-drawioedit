@@ -73,9 +73,9 @@
   outline-offset: 2px;
 }
 
-/* This plugin's own write state. The editor reports its own "All changes saved"
-   in its toolbar, so this line names the write this plugin performed and stays
-   out of the way once it is confirmed. */
+/* This plugin's own write state, for the writes drawio cannot report itself: the
+   one in flight, and a rename. A write that lands draws nothing, so the editor
+   frame keeps its geometry instead of moving down for a moment. */
 .writeState {
   display: flex;
   align-items: center;
@@ -84,10 +84,6 @@
   padding: 4px 12px;
   color: var(--dsw-alias-label-secondary);
   font: var(--dsw-font-xs-13);
-}
-
-.writeState[data-phase='saved'] {
-  color: var(--dsw-alias-state-success-primary);
 }
 
 .error {

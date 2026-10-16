@@ -11,15 +11,13 @@ import css from './EditorBody.module.css'
 /** The tab seat's standard props plus this entry's dictionary. */
 export type EditorBodyProps = PropsRuntime<'sidebar.right.pane.tab'> & PropsLocale<'sidebarDrawioEdit'>
 
-/** How long a confirmed write is announced before the editor's own status owns it. */
-const SAVED_HOLD_MS = 2000
-
 /**
- * This plugin's own write phase, shown above the frame. The editor reports its
- * own "All changes saved", so this line speaks only for the write this plugin
- * performed: which one is in flight, and whether it landed.
+ * This plugin's own write phase, shown above the frame. Only the two phases the
+ * editor cannot report are named: a confirmed write needs no line, because the
+ * editor's own toolbar already says the diagram is saved and a second line above
+ * the frame would push the editor down every time a change lands.
  */
-type WritePhase = 'saving' | 'renaming' | 'saved'
+type WritePhase = 'saving' | 'renaming'
 
 type Loaded =
   | {
@@ -45,7 +43,7 @@ export function EditorBody({ useTabInfo, t }: EditorBodyProps): ReactNode {
   const { tab } = useTabInfo()
   const address = tab.contentId
   const [loaded, setLoaded] = useState<Loaded>()
-  /** Why the last write failed. A write that lands is reported by the editor itself. */
+  /** Why the last write failed. A write that lands is reported by the editor's own toolbar. */
   const [failure, setFailure] = useState<{ readonly message: string; readonly code: string | undefined }>()
   /** The visible phase of this plugin's own write, and nothing else. */
   const [phase, setPhase] = useState<WritePhase>()
@@ -92,14 +90,6 @@ export function EditorBody({ useTabInfo, t }: EditorBodyProps): ReactNode {
     return () => { lifetime.abort() }
   }, [address, tab.signal, attempt])
 
-  // A confirmed write is announced for a moment; after that the editor's own
-  // toolbar is the status and a second line would only repeat it.
-  useEffect(() => {
-    if (phase !== 'saved') return undefined
-    const timer = setTimeout(() => { setPhase(current => current === 'saved' ? undefined : current) }, SAVED_HOLD_MS)
-    return () => { clearTimeout(timer) }
-  }, [phase])
-
   useEffect(() => {
     if (loaded?.kind !== 'ready') return
     const absolutePath = loaded.absolutePath
@@ -145,7 +135,8 @@ export function EditorBody({ useTabInfo, t }: EditorBodyProps): ReactNode {
         (next) => {
           version.current = next
           setFailure(undefined)
-          setPhase('saved')
+          // A confirmed write needs no line of its own: drawio's toolbar states it.
+          setPhase(undefined)
           // The write is the host's, and drawio has no other way to learn it landed.
           // Without this it keeps showing "Unsaved changes. Click here to save."
           // Whether or not the file was written, so a success looks like a failure.
@@ -215,10 +206,11 @@ export function EditorBody({ useTabInfo, t }: EditorBodyProps): ReactNode {
       </button>
     </div>
   }
-  // Two lines at most, and each answers a question the editor does not: the
-  // plugin's own write phase, and a write that was refused.
+  // Two lines at most, and each answers a question the editor does not: a write
+  // this plugin has in flight, and a write that was refused. Neither is drawn for
+  // a write that landed, so a landing change never moves the frame.
   return <div className={css.frame} data-drawio-editor aria-busy={busy}>
-    {phase !== undefined && <p className={css.writeState} data-phase={phase} role="status">{t(phase)}</p>}
+    {phase !== undefined && <p className={css.writeState} role="status">{t(phase)}</p>}
     {failure !== undefined && <p className={`${css.status} ${css.error}`} role="alert">
       {`${t('saveFailed')}${failureDetail}`}
     </p>}
