@@ -1,11 +1,24 @@
-/** draw.io editor tab: the upstream webapp in an iframe, driven by `postMessage`. */
+/**
+ * The `.drawio` canvas: the upstream editor in a same-origin iframe, driven by
+ * `postMessage`, with an optional switch back to whoever else can show the file.
+ *
+ * Two hosts mount it. The right-Sidebar tab body reads the file through this
+ * plugin's transports and switches nothing (the Sidebar owns that choice); the
+ * workbench viewer passes the file it already resolved and draws the switch.
+ * Both get the same editor, the same save path, and the same failure lines.
+ *
+ * @module @guowenzhang/dsh-drawioedit/client/DrawioCanvas
+ */
+
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
-import { editorTransports } from './transports.ts'
-import { DiagramSaveError, editorUrl, parseEditorMessage } from './editor.ts'
 import { fileAddressFor } from '@deepseek-ai/dsh-util-workspace-path'
+import { DiagramSaveError, editorUrl, parseEditorMessage } from './editor.ts'
 import { basenameOf } from './file-name.ts'
-import type {} from './locales.ts'
+import { ViewerSwitch } from './ViewerSwitch.tsx'
+import { editorTransports } from './transports.ts'
+import type { EditorTransports } from './transports.ts'
+import type { DrawioEditKey } from './locales.ts'
 import css from './EditorBody.module.css'
 
 /** The tab seat's standard props plus this entry's dictionary. */
@@ -19,6 +32,46 @@ export type EditorBodyProps = PropsRuntime<'sidebar.right.pane.tab'> & PropsLoca
  */
 type WritePhase = 'saving' | 'renaming'
 
+/** One file the canvas edits. */
+export interface DrawioSource {
+  /** The file's `dsh-resource://file/…` address; reads and saves address it. */
+  readonly address: string
+  /** The name the editor opens under, used for its own title and rename prompt. */
+  readonly name: string
+  /** Whether the host allows renaming this file (the tab host does, a viewer does not). */
+  readonly readOnly: boolean
+}
+
+/** Another implementation of the same file, offered by the switch when the host draws one. */
+export interface DrawioAlternate {
+  /** Caption of the switch's second segment. */
+  readonly label: string
+  /** Hands the file to that implementation. */
+  readonly select: () => void
+}
+
+/** Props of the canvas, independent of which host mounts it. */
+export interface DrawioCanvasProps {
+  /** The file being edited. */
+  readonly source: DrawioSource
+  /** The read and save transports; the tab body uses the installed ones. */
+  readonly transports: EditorTransports
+  /** The other implementation of the file, when the host draws a switch. */
+  readonly alternate?: DrawioAlternate
+  /** This package's dictionary. */
+  readonly t: (key: DrawioEditKey, params?: Record<string, string>) => string
+  /** Opens a replacement address, for a host that owns the tab. */
+  readonly openAddress?: (address: string) => void
+}
+
+/** The render machinery the canvas uses, passed in so every host can drive it. */
+export interface DrawioCanvasHooks {
+  readonly useState: typeof useState
+  readonly useRef: typeof useRef
+  readonly useMemo: typeof useMemo
+  readonly useEffect: typeof useEffect
+}
+
 type Loaded =
   | {
     readonly kind: 'ready'
@@ -31,48 +84,46 @@ type Loaded =
   | { readonly kind: 'failed'; readonly address: string; readonly reason: string }
 
 /**
- * Host the draw.io editor for one `.drawio` file.
+ * Edit one `.drawio` file.
  *
  * The diagram reaches the editor through its URL, which is the one load path
  * that needs no handshake; the editor then reports every change back as an
  * `autosave` message carrying the full XML, and that is what gets persisted.
- * @param props - standard tab seats and the locale.
+ * @param props - the file, the transports, the optional switch, and the dictionary.
  * @returns the editor frame, a loading status, or the reason it could not open.
  */
-export function EditorBody({ useTabInfo, t }: EditorBodyProps): ReactNode {
-  const { tab } = useTabInfo()
-  const address = tab.contentId
-  const [loaded, setLoaded] = useState<Loaded>()
+export function DrawioCanvas({ source, transports, alternate, t, openAddress, hooks: h }: DrawioCanvasProps & { readonly hooks: DrawioCanvasHooks }): ReactNode {
+  const { address, name: sourceName, readOnly } = source
+  const [loaded, setLoaded] = h.useState<Loaded>()
   /** Why the last write failed. A write that lands is reported by the editor's own toolbar. */
-  const [failure, setFailure] = useState<{ readonly message: string; readonly code: string | undefined }>()
+  const [failure, setFailure] = h.useState<{ readonly message: string; readonly code: string | undefined }>()
   /** The visible phase of this plugin's own write, and nothing else. */
-  const [phase, setPhase] = useState<WritePhase>()
+  const [phase, setPhase] = h.useState<WritePhase>()
   /** Bumped by Retry to read the same file again. */
-  const [attempt, setAttempt] = useState(0)
-  const frame = useRef<HTMLIFrameElement>(null)
+  const [attempt, setAttempt] = h.useState(0)
+  const frame = h.useRef<HTMLIFrameElement>(null)
   /** The freshness token to offer on the next save: seeded by the read, advanced by each write. */
-  const version = useRef<string>('')
+  const version = h.useRef<string>('')
   /** The newest diagram awaiting a write, and whether a write is in flight. */
-  const pending = useRef<{ xml: string } | undefined>(undefined)
-  const saving = useRef(false)
-  const renameWanted = useRef<string | undefined>(undefined)
-  const renaming = useRef(false)
+  const pending = h.useRef<{ xml: string } | undefined>(undefined)
+  const saving = h.useRef(false)
+  const renameWanted = h.useRef<string | undefined>(undefined)
+  const renaming = h.useRef(false)
   const busy = phase === 'saving' || phase === 'renaming'
 
-  useEffect(() => {
+  h.useEffect(() => {
     const lifetime = new AbortController()
-    const signal = AbortSignal.any([lifetime.signal, tab.signal])
-    // A retry, or a different tab address, starts from the placeholder rather than
+    // A retry, or a different file, starts from the placeholder rather than
     // leaving the previous file's failure on screen.
     setLoaded(undefined)
     /** Report a read failure; the reason is shown so the pane is never silent. */
     const failed = (error: unknown): void => {
-      if (signal.aborted) return
+      if (lifetime.signal.aborted) return
       setLoaded({ kind: 'failed', address, reason: error instanceof Error ? error.message : String(error) })
     }
-    void editorTransports().read(address, signal).then(
+    void transports.read(address, lifetime.signal).then(
       (opened) => {
-        if (signal.aborted) return
+        if (lifetime.signal.aborted) return
         version.current = opened.version
         setLoaded({
           kind: 'ready',
@@ -88,9 +139,9 @@ export function EditorBody({ useTabInfo, t }: EditorBodyProps): ReactNode {
     // escape as an unhandled rejection and leave the pane on the loading line.
     ).catch(failed)
     return () => { lifetime.abort() }
-  }, [address, tab.signal, attempt])
+  }, [address, transports, attempt])
 
-  useEffect(() => {
+  h.useEffect(() => {
     if (loaded?.kind !== 'ready') return
     const absolutePath = loaded.absolutePath
 
@@ -100,8 +151,11 @@ export function EditorBody({ useTabInfo, t }: EditorBodyProps): ReactNode {
       renameWanted.current = undefined
       renaming.current = true
       setPhase('renaming')
-      void editorTransports().rename(absolutePath, requested, version.current, loaded.sessionId).then(result => {
-        tab.actions.openResource(fileAddressFor(loaded.sessionId, undefined, result.path), { replaceTab: true })
+      void transports.rename(absolutePath, requested, version.current, loaded.sessionId).then((result) => {
+        // The tab host replaces its own tab; any other host is handed the new
+        // address so the pane it owns can follow the file.
+        if (openAddress !== undefined) openAddress(fileAddressFor(loaded.sessionId, undefined, result.path))
+        else window.dispatchEvent(new CustomEvent(DRAWIO_RENAMED, { detail: result.path }))
       }).catch((error: unknown) => {
         setFailure({ message: `${t('renameFailed')}${error instanceof Error ? error.message : String(error)}`, code: error instanceof DiagramSaveError ? error.code : undefined })
       }).finally(() => {
@@ -118,28 +172,28 @@ export function EditorBody({ useTabInfo, t }: EditorBodyProps): ReactNode {
      * so dragging a shape produces a burst: two saves racing would both offer the
      * same token, and the second would be refused as stale even though nothing
      * else touched the file. Serialising also collapses the burst — only the
-     * newest diagram is worth writing.
+     * latest diagram of a burst is written.
      */
     const drain = (): void => {
-      if (saving.current || renaming.current || pending.current === undefined) {
+      if (saving.current || renaming.current) return
+      const next = pending.current
+      if (next === undefined) {
         renameIfReady()
         return
       }
-      const xml = pending.current.xml
       pending.current = undefined
       saving.current = true
       setPhase('saving')
-      void editorTransports().save(absolutePath, xml, version.current, loaded.sessionId).then(
-        // Each write yields the token the next one must offer, so a write by
-        // anyone else in between is refused rather than overwritten.
-        (next) => {
-          version.current = next
-          setFailure(undefined)
-          // A confirmed write needs no line of its own: drawio's toolbar states it.
+      void transports.save(absolutePath, next.xml, version.current, loaded.sessionId).then(
+        (fresh) => {
+          version.current = fresh
           setPhase(undefined)
-          // The write is the host's, and drawio has no other way to learn it landed.
-          // Without this it keeps showing "Unsaved changes. Click here to save."
-          // Whether or not the file was written, so a success looks like a failure.
+          setFailure(undefined)
+          // Tell the frame its content is on disk. The editor's "unsaved" badge
+          // is set from the report it made when the change happened; drawio does
+          // not clear it on its own, and the tab would otherwise keep saying
+          // "Unsaved changes. Click here to save." whether the write landed or
+          // not -- a success would look like a failure.
           frame.current?.contentWindow?.postMessage(JSON.stringify({ action: 'saved' }), '*')
         },
         (error: unknown) => {
@@ -162,10 +216,9 @@ export function EditorBody({ useTabInfo, t }: EditorBodyProps): ReactNode {
       const message = parseEditorMessage(event.data)
       if (message?.xml === undefined || !['autosave', 'save', 'saveAs'].includes(message.event)) return
       pending.current = { xml: message.xml }
-      const filename = basenameOf(address)
-      const isInitialName = /^\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}-\d{3}(?:-\d+)?\.drawio$/u.test(filename)
-      if (message.event === 'saveAs' || (message.event === 'save' && isInitialName)) {
-        const chosen = window.prompt(t('renamePrompt'), isInitialName ? '' : filename.replace(/\.drawio$/iu, ''))
+      const initialName = /^\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}-\d{3}(?:-\d+)?\.drawio$/u.test(sourceName)
+      if (!readOnly && (message.event === 'saveAs' || (message.event === 'save' && initialName))) {
+        const chosen = window.prompt(t('renamePrompt'), initialName ? '' : sourceName.replace(/\.drawio$/iu, ''))
         if (chosen?.trim()) renameWanted.current = chosen.trim()
       }
       drain()
@@ -175,7 +228,7 @@ export function EditorBody({ useTabInfo, t }: EditorBodyProps): ReactNode {
       window.removeEventListener('message', onMessage)
       pending.current = undefined
     }
-  }, [loaded, address, tab.actions, t])
+  }, [loaded, sourceName, readOnly, transports, t, openAddress])
 
   const name = basenameOf(address)
   const failureDetail = failure?.code === 'FS_SANDBOX_DENIED'
@@ -184,7 +237,7 @@ export function EditorBody({ useTabInfo, t }: EditorBodyProps): ReactNode {
       ? t('saveConflict')
       : failure?.message
 
-  const src = useMemo(
+  const src = h.useMemo(
     () => (loaded?.kind === 'ready' ? editorUrl(loaded.xml, '', name) : undefined),
     [loaded, name],
   )
@@ -199,7 +252,7 @@ export function EditorBody({ useTabInfo, t }: EditorBodyProps): ReactNode {
   if (loaded.kind === 'failed') {
     return <div className={css.failure} role="alert">
       <p className={css.status}>{`${t('failed')} ${loaded.reason}`}</p>
-      {/* A read can fail for a reason that does not repeat, and this tab is the
+      {/* A read can fail for a reason that does not repeat, and this pane is the
           only place that can offer the same file again. */}
       <button type="button" className={css.retry} onClick={() => setAttempt(current => current + 1)}>
         {t('retry')}
@@ -210,6 +263,18 @@ export function EditorBody({ useTabInfo, t }: EditorBodyProps): ReactNode {
   // this plugin has in flight, and a write that was refused. Neither is drawn for
   // a write that landed, so a landing change never moves the frame.
   return <div className={css.frame} data-drawio-editor aria-busy={busy}>
+    {alternate !== undefined && (
+      <div className={css.viewerRow}>
+        <ViewerSwitch
+          label={t('viewerLabel')}
+          first={t('viewerDiagram')}
+          second={alternate.label}
+          selected="first"
+          onFirst={() => {}}
+          onSecond={alternate.select}
+        />
+      </div>
+    )}
     {phase !== undefined && <p className={css.writeState} role="status">{t(phase)}</p>}
     {failure !== undefined && <p className={`${css.status} ${css.error}`} role="alert">
       {`${t('saveFailed')}${failureDetail}`}
@@ -233,4 +298,33 @@ export function EditorBody({ useTabInfo, t }: EditorBodyProps): ReactNode {
       sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals allow-downloads"
     />
   </div>
+}
+
+/** Event a host without a tab to replace listens on: `detail` is the new absolute path. */
+export const DRAWIO_RENAMED = 'dsh-drawioedit:renamed'
+
+/** The real render machinery, for hosts that mount the canvas themselves. */
+export const REACT_HOOKS: DrawioCanvasHooks = { useState, useRef, useMemo, useEffect }
+
+/**
+ * The canvas mounted as the right-Sidebar tab body.
+ *
+ * The tab owns the file by address, replaces itself when the editor renames it,
+ * and never draws a switch: the Sidebar's own tab types are the choice there.
+ * @param props - the tab seat and the dictionary.
+ * @returns the canvas.
+ */
+export function EditorBody({ useTabInfo, t }: EditorBodyProps): ReactNode {
+  const { tab } = useTabInfo()
+  const address = tab.contentId
+  // The tab seat's props carry the render machinery the shell resolved for this
+  // component; a direct test render borrows the real one through the module.
+  const hooks = (EditorBody as unknown as { __hooks?: DrawioCanvasHooks }).__hooks ?? REACT_HOOKS
+  const opened = hooks.useMemo(() => editorTransports(), [])
+  return <DrawioCanvas
+    hooks={hooks}
+    source={{ address, name: basenameOf(address), readOnly: false }}
+    transports={opened}
+    t={key => t(key)}
+  />
 }

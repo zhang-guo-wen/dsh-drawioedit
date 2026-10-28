@@ -34,7 +34,9 @@ const react = {
 // which is what the real loader does.
 const table = {
   react,
-  'react/jsx-runtime': { jsx: react.createElement, jsxs: react.createElement },
+  // The bundle imports the runtime's `jsx`/`jsxs` directly and calls them as
+  // plain functions, so these are element factories rather than methods.
+  'react/jsx-runtime': { jsx: (type, props) => ({ type, props }), jsxs: (type, props) => ({ type, props }) },
   '@deepseek-ai/dsh-client-ui-slots': {},
   '@deepseek-ai/dsh-client-ui-sidebar-right/client': {},
   '@deepseek-ai/dsh-client-locale/client': {},
@@ -84,9 +86,29 @@ const remote = {
   },
 }
 
-const registered = { dictionaries: null, type: null, body: null }
+const registered = { dictionaries: null, type: null, body: null, viewers: [], injected: 0 }
+/** Body component declarations, so the render harness can drive one directly. */
+const declarations = []
+/** The workbench service the viewer registers with, keyed by viewer id. */
+const workbench = new Map()
 moduleExports.apply({
   effect: (fn) => fn(),
+  // Loaded with the workbench present, so both hosts are exercised: the Sidebar
+  // tab and the workbench viewer.
+  inject: (_deps, callback) => {
+    registered.injected += 1
+    callback({
+      effect: (fn) => fn(),
+      get: (name) => name === 'betterSidebar'
+        ? { registerFileViewer: (viewer) => { workbench.set(viewer.id, viewer); return () => {} } }
+        : undefined,
+      locale: {
+        register: (namespace, dictionaries) => { registered.dictionaries = { namespace, dictionaries }; return () => {} },
+        bind: () => (key) => key,
+      },
+      remote,
+    })
+  },
   locale: {
     register: (namespace, dictionaries) => { registered.dictionaries = { namespace, dictionaries }; return () => {} },
     bind: () => (key) => key,
@@ -94,14 +116,27 @@ moduleExports.apply({
   sidebarRightTabs: { register: (definition) => { registered.type = definition; return () => {} } },
   slots: {
     inject: (_name, callback) => callback(),
-    register: (options, component) => { registered.body = { options, component }; return () => {} },
+    register: (options, component) => {
+      registered.body = { options, component }
+      // Compact parameter-list components land here as FRAMEWORK_ROWS rows; the
+      // declaration holds the real parameters to render with.
+      declarations.push(component)
+      return () => {}
+    },
   },
   remote,
 })
 
 assert.equal(registered.dictionaries.namespace, 'sidebarDrawioEdit', 'dictionary namespace mismatch')
 assert.equal(registered.type.kind, 'drawio-edit', 'tab kind mismatch')
-assert.equal([...registered.type.patterns].join(','), '*.drawio', 'patterns mismatch')
+// The pattern is address-shaped on purpose: the Sidebar ranks band, then matched
+// pattern length, then registration order, and a bare `*.drawio` (8) loses to a
+// workbench's `dsh-resource://file/**` catch-all (22), which would hand the file
+// to that workbench's own editor before the suffix is considered. The
+// address-shaped pattern is longer than the catch-all and still matches only
+// `.drawio` files.
+assert.equal([...registered.type.patterns].join(','), 'dsh-resource://file/**/*.drawio', 'patterns mismatch')
+assert.equal(registered.type.priority, 'extension', 'the tab type must declare its priority band')
 assert.equal(registered.type.title('dsh-resource://file/session/s1/a/flow.drawio'), 'flow.drawio', 'title mismatch')
 assert.equal(registered.type.title('dsh-resource://file/session/s1/a/AI%E5%91%98%E5%B7%A5%E6%9E%B6%E6%9E%84%E5%9B%BE.drawio'), 'AI员工架构图.drawio', 'Chinese tab title mismatch')
 assert.equal(registered.body.options.name, 'sidebar.right.pane.tab', 'slot name mismatch')
@@ -112,13 +147,38 @@ assert.equal(registered.body.options.key, '@guowenzhang/dsh-drawioedit', 'slot k
 // apply would have thrown if their shape were wrong.
 assert.equal(registered.body.options.inject, undefined, 'the body must not declare a custom inject face')
 
-// Mount the body the way the tab seat does and run its effects. Only the read has
-// work to do at mount; the save effect returns early while nothing is loaded.
+// The workbench viewer registers only through `betterSidebar`, is keyed by its
+// own unique id, and declares the band that beats the workbench's own catch-all
+// editor.
+assert.equal(registered.injected, 1, 'apply must load the workbench viewer through inject')
+const viewer = workbench.get('guowenzhang:drawio-edit')
+assert.ok(viewer, 'the workbench viewer must register under its own id')
+assert.equal([...viewer.exts].join(','), 'drawio', 'the viewer must claim .drawio only')
+assert.equal(viewer.fetchStrategy, 'fsRead', 'the viewer reads through the workbench text path')
+assert.ok(viewer.priority > 0, 'the viewer must outrank the workbench catch-all editor')
+
+// A viewer mounted by the workbench draws the switch, since that host replaces
+// the whole pane: the diagram is segment one and the source editor offers the way
+// back. It also reads the file itself, which is what carries the freshness token.
+const viewerRender = viewer.component({ scope: { sessionId: 'session-1' }, path: 'diagrams/flow.drawio' })
+assert.ok(viewerRender, 'the workbench viewer must render through the canvas')
+assert.equal(typeof viewerRender.type, 'string', 'the mounted viewer must draw a host element, not another component')
+assert.ok(typeof viewerRender.props.alternate === 'object' || typeof viewerRender.props.role === 'string',
+  'the workbench viewer must offer the switch or announce its loading state')
+
+// Mount the body the way the tab seat does -- through the hook face the module
+// exposes to a direct render -- and run its effects. Only the read has work to do
+// at mount; the save effect returns early while nothing is loaded.
 const tab = {
   contentId: 'dsh-resource://file/session/session-1/diagrams/AI%E5%91%98%E5%B7%A5%E6%9E%B6%E6%9E%84%E5%9B%BE.drawio',
   signal: new AbortController().signal,
 }
-registered.body.component({ useTabInfo: () => ({ tab }), t: (key) => key })
+registered.body.component.__hooks = react
+const bodyRender = registered.body.component({ useTabInfo: () => ({ tab }), t: (key) => key })
+// The tab body forwards to the canvas, which is the component that arms the
+// effects; render it with the props the body handed it.
+const canvasRender = bodyRender.type({ ...bodyRender.props, hooks: react })
+void canvasRender
 assert.ok(effects.length > 0, 'the body must arm its effects')
 const cleanups = effects.map(effect => effect())
 await settle(0)
@@ -137,18 +197,26 @@ assert.equal(ready.absolutePath, ABSOLUTE_PATH, 'the host-resolved path must rea
 assert.equal(ready.sessionId, 'session-1', 'the editor must retain the read session for its save policy')
 assert.equal(ready.version, VERSION, 'the freshness token must reach the save')
 
-// Render the body with one state slot forced and the rest left at their initial
-// values. The slot indices follow EditorBody's own state order:
+// Render the canvas with one state slot forced and the rest left at their
+// initial values. The slot indices follow DrawioCanvas's own state order:
 //   0 loaded · 1 failure · 2 write phase · 3 read attempt
 // so inserting a state ahead of one of them fails this suite rather than
 // silently rendering the wrong fixture.
-function renderWith(forced) {
+function renderWith(forced, hooks = {}) {
   let index = 0
-  react.useState = (initial) => {
-    const at = index++
-    return [Object.hasOwn(forced, at) ? forced[at] : initial, () => {}]
+  const scripted = {
+    ...react,
+    useState: (initial) => {
+      const at = index++
+      return [Object.hasOwn(forced, at) ? forced[at] : initial, () => {}]
+    },
+    ...hooks,
   }
-  return registered.body.component({ useTabInfo: () => ({ tab }), t: localized })
+  // The body forwards to the canvas with its hook face attached; the canvas is
+  // the component holding the states this fixture forces, and the dictionary
+  // reaches it as its own `t` because nothing else binds one.
+  const body = registered.body.component({ useTabInfo: () => ({ tab }), t: localized, __hooks: scripted })
+  return body.type({ ...body.props, hooks: scripted, t: canvasT })
 }
 
 function childrenOf(rendered) {
@@ -158,6 +226,10 @@ function childrenOf(rendered) {
 // A key the dictionary does not carry reads as the key itself, the way the
 // locale binding behaves, so a stale phase cannot crash a render.
 const localized = (key, params) => (registered.dictionaries.dictionaries.zh[key] ?? key)
+  .replace('{name}', params?.name ?? '{name}')
+// The canvas receives the dictionary directly: it is not a slot component, so
+// nothing binds `t` for it and its own parameters must resolve here.
+const canvasT = (key, params) => (registered.dictionaries.dictionaries.zh[key] ?? key)
   .replace('{name}', params?.name ?? '{name}')
 
 // The ready body: the tab address is percent-encoded, while the draw.io filename

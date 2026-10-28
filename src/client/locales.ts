@@ -14,6 +14,9 @@ export const zh = {
   saveConflict: '文件已被其他操作修改，为避免覆盖，保存被拒绝。请先导出当前图表副本，再重新打开文件合并修改。',
   renamePrompt: '图表名称（保存为 .drawio 文件）',
   renameFailed: '重命名失败：',
+  viewerLabel: '显示方式',
+  viewerDiagram: '图表编辑',
+  viewerSource: '源码',
 } satisfies Record<string, string>
 
 /** draw.io editor dictionary keys. */
@@ -35,6 +38,9 @@ export const en = {
   saveConflict: 'The file changed elsewhere, so saving was refused to avoid overwriting it. Export a copy of this diagram, then reopen the file and merge your changes.',
   renamePrompt: 'Diagram name (saved as a .drawio file)',
   renameFailed: 'Could not rename: ',
+  viewerLabel: 'View',
+  viewerDiagram: 'Diagram',
+  viewerSource: 'Source',
 } satisfies Record<DrawioEditKey, string>
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {

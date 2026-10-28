@@ -17,10 +17,11 @@ import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 import { parseFileAddress } from '@deepseek-ai/dsh-util-workspace-path'
-import { EditorBody } from './EditorBody.tsx'
+import { EditorBody } from './DrawioCanvas.tsx'
 import { basenameOf } from './file-name.ts'
 import { renameDiagram, saveDiagram } from './editor.ts'
 import { setEditorTransports, type EditorTransports } from './transports.ts'
+import { registerWorkbenchViewer } from './workbench-viewer.ts'
 import { en, zh } from './locales.ts'
 
 /** This package's copy namespace. */
@@ -53,7 +54,15 @@ export function apply(ctx: ClientContext): void {
   ctx.effect(() => ctx.sidebarRightTabs.register({
     id: DRAWIO_EDIT_ID,
     kind: DRAWIO_EDIT_KIND,
-    patterns: ['*.drawio'],
+    // The Sidebar ranks types by band, then by the length of the matched
+    // pattern, then by registration order. A bare `*.drawio` is only 8
+    // characters, so a whole-address catch-all (`dsh-resource://file/**`, 22
+    // characters, registered by a workbench's own editor type) outranks it and
+    // takes every file — including this one — before the suffix is ever
+    // considered. The address-shaped pattern is 31 characters: longer than that
+    // catch-all, and it still only matches files whose name ends in `.drawio`.
+    patterns: ['dsh-resource://file/**/*.drawio'],
+    priority: 'extension',
     title: basenameOf,
   }), 'dsh-drawioedit: tab type')
 
@@ -86,4 +95,8 @@ export function apply(ctx: ClientContext): void {
     { name: 'sidebar.right.pane.tab', key: DRAWIO_EDIT_ID, locale: NS },
     EditorBody,
   )), 'dsh-drawioedit: tab body')
+
+  // The same editor as a workbench viewer. It registers only where that
+  // workbench is installed, so no host gains a dependency on it.
+  registerWorkbenchViewer(ctx)
 }

@@ -92,10 +92,65 @@
   border-bottom: 1px solid var(--dsw-alias-state-error-primary);
 }
 
+/* The switch a workbench viewer draws above the editor. The tab body in the
+   right Sidebar never shows it: the Sidebar's own tab types are the choice
+   there. */
+.viewerRow {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  padding: 6px 8px;
+  border-bottom: .5px solid var(--dsw-alias-border-l2);
+  background: var(--dsw-alias-bg-layer-2);
+}
+
+.viewerSwitch {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 2px;
+  box-sizing: border-box;
+  padding: 2px;
+  border: .5px solid var(--dsw-alias-border-l1);
+  border-radius: var(--dsw-radius-md);
+  background: var(--dsw-alias-bg-layer-1);
+}
+
+.viewerOption {
+  box-sizing: border-box;
+  height: 24px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--dsw-radius-sm);
+  background: transparent;
+  color: var(--dsw-alias-label-tertiary);
+  font: var(--dsw-font-xxxs-11);
+  cursor: pointer;
+}
+
+.viewerOption:hover {
+  color: var(--dsw-alias-label-primary);
+}
+
+.viewerOption[aria-pressed='true'] {
+  background: var(--dsw-alias-bg-base);
+  box-shadow: var(--dsw-elevation-soft);
+  color: var(--dsw-alias-label-primary);
+}
+
+.viewerOption:focus-visible {
+  outline: var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary));
+  outline-offset: 2px;
+}
+
 /* Touch hardware: the same control, at a target a finger can hit. */
 @media (pointer: coarse) {
   .retry {
     min-height: 44px;
+  }
+
+  .viewerOption {
+    height: 32px;
   }
 }
 
