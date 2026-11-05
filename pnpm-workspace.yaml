@@ -1,0 +1,9 @@
+packages:
+  - .
+
+# 这些仓在 npm 的扁平 node_modules 下开发：lib/ 里的模块路径注释会跟着解析后的真实
+# 路径走，hoisted 保持同样的扁平布局，产物因此逐字节可复现。
+nodeLinker: hoisted
+
+# npm 7+ 也会自动安装 peer，这里保持同样的行为；未满足的 peer 只警告不报错。
+strictPeerDependencies: false

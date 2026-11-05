@@ -24,8 +24,8 @@ paths:
 - `src/params.ts` —— 编辑器 URL（`EDITOR_PATH`、`editorUrl()`）与按名字关闭的云集成清单（`DISABLED_INTEGRATIONS`）。
 - `src/client/` —— 浏览器半边：`index.ts`（标签类型、body 座位、transports 安装）、`EditorBody.tsx`（iframe 与消息泵；读取有骨架与失败重试，写入有 保存中 / 已保存 / 失败 三态）、`transports.ts`（read/save 模块句柄）、`editor.ts`（消息解析与 save POST）、`locales.ts`、`EditorBody.module.css`。
 - `editor/` —— 随包的上游 drawio webapp（裁剪说明见 [`editor-assets.md`](editor-assets.md)）；`package.json` 的 `files` 里带着它。`build-stencils.mjs` 从保留的 XML 重建 `editor/js/stencils.min.js`。
-- `lib/` —— 构建产物：**已提交进仓库**（`index.mjs` host + `client.js` 浏览器 handoff），这样别人可以直接从 git 安装。改完源码**记得 `npm run build` 并把 `lib/` 一起提交**；`lib/index.mjs` 里内嵌了 shim 源码。
+- `lib/` —— 构建产物：**已提交进仓库**（`index.mjs` host + `client.js` 浏览器 handoff），这样别人可以直接从 git 安装。改完源码**记得 `pnpm run build` 并把 `lib/` 一起提交**；`lib/index.mjs` 里内嵌了 shim 源码。
 - `cordis.patch.yml` —— 把插件行插入组合的 bundle 层。
 - `docs/example.png` / `docs/example.drawio` —— README 的截图与它的源文件。
-- `tests/` —— 十一个套件（`npm test`）与不进套件的 `tests/debug/`。
+- `tests/` —— 十一个套件（`pnpm test`）与不进套件的 `tests/debug/`。
 - `.claude/rules/` —— `AGENTS.md` 的明细分册，按需读取；**不在** `package.json` 的 `files` 里，因此不随 npm 包分发（放包根而不是 `docs/`：`files` 包含整个 `docs`）。

@@ -18,26 +18,26 @@
 - `editor/` —— 随包的上游 drawio webapp（裁剪说明见 [`.claude/rules/editor-assets.md`](.claude/rules/editor-assets.md)）；`build-stencils.mjs` 从保留的 XML 重建 `editor/js/stencils.min.js`。
 - `lib/` —— 构建产物：**已提交进仓库**（`index.mjs` host + `client.js` 浏览器 handoff），`lib/index.mjs` 里内嵌了 shim 源码。
 - `cordis.patch.yml` —— 把插件行插入组合的 bundle 层；`docs/` —— README 的截图与它的源文件。
-- `tests/` —— 套件（`npm test`）与不进套件的 `tests/debug/`；`.claude/rules/` —— 本文件的明细分册（**不在** `package.json` 的 `files` 里，因此不随 npm 包分发）。
+- `tests/` —— 套件（`pnpm test`）与不进套件的 `tests/debug/`；`.claude/rules/` —— 本文件的明细分册（**不在** `package.json` 的 `files` 里，因此不随 npm 包分发）。
 
 每个文件的职责、导出与边界见 [`.claude/rules/repo-layout.md`](.claude/rules/repo-layout.md)。
 
 ## 构建与测试命令
 
 ```sh
-npm install
-npm run build      # tsdown（host） + node build-client.mjs（client） + node build-stencils.mjs
-npm run typecheck  # tsc --noEmit -p tsconfig.json，针对「已发布」的 @deepseek-ai/* 包
-npm test           # 无需密钥的套件，其中 boot 与 offline 驱动真实 headless Chrome
-npm run test:metadata  # node --test tests/plugin-metadata.test.mjs
+pnpm install
+pnpm run build      # tsdown（host） + node build-client.mjs（client） + node build-stencils.mjs
+pnpm run typecheck  # tsc --noEmit -p tsconfig.json，针对「已发布」的 @deepseek-ai/* 包
+pnpm test           # 无需密钥的套件，其中 boot 与 offline 驱动真实 headless Chrome
+pnpm run test:metadata  # node --test tests/plugin-metadata.test.mjs
 ```
 
-`boot` / `offline` 默认按平台查找 Chrome，装在别处用 `CHROME_PATH` 指定；找不到可执行文件时探针打印原因并以 2 退出。`prepublishOnly` 只跑 `artifact`、`stencils`、`editor-assets`、`smoke`，发布前的手工检查仍以 `npm test` 为准。构建链路与各套件的分工见 [`.claude/rules/build-and-artifacts.md`](.claude/rules/build-and-artifacts.md) 与 [`.claude/rules/tests-and-browser.md`](.claude/rules/tests-and-browser.md)。
+`boot` / `offline` 默认按平台查找 Chrome，装在别处用 `CHROME_PATH` 指定；找不到可执行文件时探针打印原因并以 2 退出。`prepublishOnly` 只跑 `artifact`、`stencils`、`editor-assets`、`smoke`，发布前的手工检查仍以 `pnpm test` 为准。构建链路与各套件的分工见 [`.claude/rules/build-and-artifacts.md`](.claude/rules/build-and-artifacts.md) 与 [`.claude/rules/tests-and-browser.md`](.claude/rules/tests-and-browser.md)。
 
 ## 硬约束
 
 1. **仓库根就是包。** 不要放进 `packages/*`，也不要改根 `package.json` 的定位——`dsh plugin add <git-url>` 取仓库根，否则会装成错误的东西（`editor/` 也不会被打包）。
-2. **`lib/` 是提交进仓库的产物。** 改完源码必须 `npm run build` 并把 `lib/` 一起提交；`artifact` 套件检查产物不早于源码，重建 host 半边时漏更新 `lib/client.js` 会静默留下旧产物。
+2. **`lib/` 是提交进仓库的产物。** 改完源码必须 `pnpm run build` 并把 `lib/` 一起提交；`artifact` 套件检查产物不早于源码，重建 host 半边时漏更新 `lib/client.js` 会静默留下旧产物。
 3. **两半的生效方式不同。** host 半边是进程内模块，重建 `lib/index.mjs` 后必须重启宿主（路由、保存端点、shim 都在里面）；client 半边按内容 revision 提供，改 `src/client/` 后必须 bump `HANDOFF_ID` 或强刷浏览器。`HANDOFF_ID` 必须与 `lib/client.js` 包裹里的 `id` 及 `tests/smoke.mjs` 断言的 id 一致。
 4. **`build-client.mjs` 的 `platform: 'browser'` 不能掉。** 退到 `node` platform 会把依赖的服务端入口内联，产物在浏览器里因 `require("module")` 直接加载失败。
 5. **iframe 必须与 harness 前端同源**，sandbox 逐字为 `allow-scripts allow-same-origin allow-forms allow-popups allow-modals allow-downloads`（`tests/boot.mjs` 复用同一字符串）；跨源会让父页面读不到编辑器，握手、消息与保存全失效。

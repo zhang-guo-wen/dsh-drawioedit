@@ -11,17 +11,17 @@ paths:
 ## 构建
 
 ```sh
-npm install
-npm run build      # tsdown（host） + node build-client.mjs（client） + node build-stencils.mjs
-npm run typecheck  # tsc --noEmit -p tsconfig.json，针对「已发布」的 @deepseek-ai/* 包
-npm test           # 十一个无需密钥的套件，其中两个驱动真实浏览器
-npm run test:metadata  # node --test tests/plugin-metadata.test.mjs，独立入口、不进 npm test
+pnpm install
+pnpm run build      # tsdown（host） + node build-client.mjs（client） + node build-stencils.mjs
+pnpm run typecheck  # tsc --noEmit -p tsconfig.json，针对「已发布」的 @deepseek-ai/* 包
+pnpm test           # 十一个无需密钥的套件，其中两个驱动真实浏览器
+pnpm run test:metadata  # node --test tests/plugin-metadata.test.mjs，独立入口、不进 pnpm test
 ```
 
 - host：`tsdown` 打 `src/index.ts` → `lib/index.mjs`，`tsdown.config.ts` 里 `deps.neverBundle: [/^@deepseek-ai\//]` 让所有 `@deepseek-ai/*` 保持 external。
 - client：`build-client.mjs`（rolldown）→ `lib/client.js`，包成 `window.__ModuleLoader__.load({ id, factory })`，react 与 `@deepseek-ai/*` external，`.module.css` 用 lightningcss 编译（`cssModules.pattern: '[hash]_[local]'`）并内联成一个去重的 `<style>` 标签；类名映射按局部名排序后再序列化，保证构建可复现。
 - 本仓两半都不使用装饰器（host 侧没有 `@Remote`），所以 `tsdown.config.ts` 里没有装饰器降级 transform。
-- `prepublishOnly` 跑 `artifact`、`stencils`、`editor-assets` 与 `smoke` 四个套件，所以发布前的手工检查仍以 `npm test` 为准。
+- `prepublishOnly` 跑 `artifact`、`stencils`、`editor-assets` 与 `smoke` 四个套件，所以发布前的手工检查仍以 `pnpm test` 为准。
 
 **`platform: 'browser'` 是显式设置的。** harness 单仓打客户端产物用的 `packages/client/tsdown.client.ts` 并未发布，所以本仓自己打包浏览器半。在 rolldown 的 `node` platform 下，依赖会经 `node` export 条件解析：若某库的 `exports` 把平台条件排在 `import` 之前，它的**服务端入口**就会被内联，而那些入口可能在模块顶层 `require("module")`，产出浏览器模块表无法应答的标识符。`build-client.mjs` 的 `EXTERNAL` 只有 react 与 DSH 客户端包（`@deepseek-ai/cordis`、`dsh-client-locale`、`dsh-client-ui-renderer`、`dsh-client-ui-slots`、`dsh-client-ui-sidebar-right`）；`@deepseek-ai/dsh-util-workspace-path` 这类浏览器安全的工具**被内联**（对齐 harness 的 INLINE_SAFE 策略），所以部署产物不会向模块表索取它。
 

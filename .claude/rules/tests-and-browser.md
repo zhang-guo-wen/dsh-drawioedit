@@ -7,7 +7,7 @@ paths:
 
 ## 测试
 
-`npm test` 跑十一个无需密钥的套件；其中 `boot` 与 `offline` 驱动真实的 headless Chrome，默认按平台查找（Windows `C:/Program Files/Google/Chrome/Application/chrome.exe`、macOS `/Applications/Google Chrome.app/Contents/MacOS/Google Chrome`、Linux `google-chrome`），装在别处就用 `CHROME_PATH` 指向 Chrome/Chromium 可执行文件；找不到可执行文件时探针会明确打印原因并以 2 退出，而不是看起来像挂死。
+`pnpm test` 跑十一个无需密钥的套件；其中 `boot` 与 `offline` 驱动真实的 headless Chrome，默认按平台查找（Windows `C:/Program Files/Google/Chrome/Application/chrome.exe`、macOS `/Applications/Google Chrome.app/Contents/MacOS/Google Chrome`、Linux `google-chrome`），装在别处就用 `CHROME_PATH` 指向 Chrome/Chromium 可执行文件；找不到可执行文件时探针会明确打印原因并以 2 退出，而不是看起来像挂死。
 
 | 套件 | 证明什么 |
 |---|---|
@@ -23,8 +23,8 @@ paths:
 | `boot` | 编辑器启动到画布、画出图表、回传、命名，并让菜单在菜单栏旁边展开 |
 | `offline` | 编辑器启动全程未访问远程主机、外部实体未被解析、请求的每个资源都存在、控制台没有初始化失败 |
 
-`artifact` 存在的理由不是形式主义：`npm run build` 曾被发现在重建 host 半边时把 `lib/client.js` 留在旧版本，于是修复能通过 typecheck 与测试（测试跑的是产物）而产物仍是旧代码。`boot` 存在的理由同样具体：更窄的套件在一个坏掉的编辑器上也会全绿——host 可以把每个字节都用 200 发出去，shim 也可以钩住类，而应用仍停在 splash 上。
+`artifact` 存在的理由不是形式主义：`pnpm run build` 曾被发现在重建 host 半边时把 `lib/client.js` 留在旧版本，于是修复能通过 typecheck 与测试（测试跑的是产物）而产物仍是旧代码。`boot` 存在的理由同样具体：更窄的套件在一个坏掉的编辑器上也会全绿——host 可以把每个字节都用 200 发出去，shim 也可以钩住类，而应用仍停在 splash 上。
 
 `offline` 的资源断言是有价值的：`editor/mxgraph/css/common.css` 是 `div.mxPopupMenu { position: absolute }` 唯一的声明处，缺了它编辑器照样能启动——菜单只是顺着文档流跑到工具栏下面——所以真正抓住资源缺失的是那条 4xx 断言。`tests/debug/` 放的是开发 embed 协议期间用的浏览器驱动与 bundle 扫描工具（`capture-docs-shot.mjs`、`cdp-check.mjs`、`live-probe.mjs`、`protocol.mjs`、`sandbox-probe.mjs`、`scan-assets.mjs`、`scan-bundle.mjs`、`scan-urlparams.mjs`），不进套件，其中 `scan-assets.mjs` 是**故意有噪声**的。
 
-另一条 `npm test` 之外的入口：`npm run test:metadata` 跑 `tests/plugin-metadata.test.mjs`（包元数据检查）。
+另一条 `pnpm test` 之外的入口：`pnpm run test:metadata` 跑 `tests/plugin-metadata.test.mjs`（包元数据检查）。
